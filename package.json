@@ -1,0 +1,33 @@
+{
+  "name": "kalibra",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "demo": "tsx scripts/demo.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.4.0",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.11.0",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.69.0",
+    "vitest": "^4.1.11"
+  },
+  "dependencies": {
+    "@kalibra/core": "workspace:*"
+  }
+}

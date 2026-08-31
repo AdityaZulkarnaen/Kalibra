@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+pnpm-lock.yaml
+fixtures/
+
+# The specification set is hand-wrapped and normative. Reformatting it would produce
+# noise in every diff and risks touching the numeric tables.
+*.md
+docs/
