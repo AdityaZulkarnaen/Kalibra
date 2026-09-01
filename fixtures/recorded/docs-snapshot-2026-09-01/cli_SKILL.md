@@ -1,0 +1,124 @@
+# dreamDEX CLI - LLM Skill Reference
+
+You are interacting with `dreamdex`, a non-custodial trading CLI for dreamDEX on the Somnia blockchain. This document describes every command, its arguments, and expected outputs so you can use the CLI effectively.
+
+## Prerequisites
+
+- Keys are stored in an encrypted keystore (`~/.config/dreamdex/keystore/`). Run `dreamdex login` to import a key.
+- For headless/MCP use, set `DREAMDEX_PRIVATE_KEY` (hex-encoded, with or without `0x` prefix) to bypass the keystore, or set `DREAMDEX_PASSWORD` to unlock it non-interactively.
+- All commands support `--json` for structured JSON output. Always use `--json` when you need to parse results programmatically.
+- Commands that accept an optional `[symbol]` default to all markets when omitted. Symbols look like `SOMI:SOMUSD`, `WETH:SOMUSD`, `WBTC:SOMUSD`.
+- All write commands (order place/cancel/reduce, stoporder place/cancel, vault deposit/withdraw/approve) always wait for on-chain confirmation before returning.
+
+## Concepts
+
+**Markets** - A trading pair (e.g. `SOMI:SOMUSD`) with its own order book, tick size, lot size, and minimum quantity. Use `dreamdex markets` to discover available pairs.
+
+**Orders** - Instructions to buy or sell tokens. Market orders execute immediately as limit IOC orders priced from the order book with a slippage tolerance (default 0.5%). Limit orders rest on the book at a specified price. Sub-types: `normalOrder` (default, rests until filled), `fillOrKill` (fill entirely or cancel), `immediateOrCancel` (fill what you can, cancel rest), `postOnly` (only accepted if it rests on the book).
+
+**Stop orders** - Conditional orders that activate when the market price crosses a trigger. Use `--trigger-operator lte` for stop-loss (sell when price drops) or `--trigger-operator gte` for breakout entry (buy when price rises). States: `pending`, `triggered`, `canceled`, `failed`.
+
+**Vault** - On-chain escrow for pre-funding trades. Workflow: approve -> deposit -> trade with `--funding-source vault` -> withdraw. Optional - orders default to `--funding-source wallet`.
+
+## Commands
+
+### Market data (no auth required)
+
+- `dreamdex markets` - List all trading pairs with tick/lot sizes and minimums.
+- `dreamdex currencies` - List supported currencies with code, name, decimals, address.
+- `dreamdex orderbook <symbol> [--depth N]` - Show order book. `--depth` limits levels per side.
+- `dreamdex ticker [symbol]` - 24-hour OHLCV statistics.
+- `dreamdex trades [symbol] [--limit N]` - Recent trades (default 20).
+- `dreamdex candles <symbol> [--interval 1m|5m|15m|1h|4h|1d] [--limit N]` - OHLCV candles (default 1h, 20).
+- `dreamdex volume <symbol> [--since <ms>] [--until <ms>]` - Base/quote trading volume over a window.
+
+### Authentication
+
+- `dreamdex login` - Import key into keystore and authenticate via SIWE.
+
+### Orders (auth required)
+
+- `dreamdex buy <amount> <symbol> [--price <n>] [--order-type ...] [--funding-source wallet|vault] [--slippage <pct>] [--builder <addr> --builder-fee <bpsx1k>]` - Buy shorthand. Market order by default; pass `--price` for limit.
+- `dreamdex sell <amount> <symbol> [--price <n>] [--order-type ...] [--funding-source wallet|vault] [--slippage <pct>] [--builder <addr> --builder-fee <bpsx1k>]` - Sell shorthand. Market order by default; pass `--price` for limit.
+- `dreamdex order place <symbol> --side buy|sell --amount <n> [--type market|limit] [--price <n>] [--order-type normalOrder|fillOrKill|immediateOrCancel|postOnly] [--funding-source wallet|vault] [--slippage <pct>] [--builder <addr> --builder-fee <bpsx1k>]` - Full form. `--price` required for limit. `--builder-fee` required and >0 when `--builder` set. Auto-submits token approval if needed.
+- `dreamdex order list [symbol...] [--status open|closed|canceled|expired|rejected] [--limit N] [--cursor <c>]` - List your orders across markets.
+- `dreamdex order get <symbol> <order-id>` - Get single order details.
+- `dreamdex order cancel <symbol> <order-id>` - Cancel an open order on-chain.
+- `dreamdex order reduce <symbol> <order-id> --quantity <new-remaining>` - Reduce remaining quantity on-chain.
+- `dreamdex mytrades [symbol] [--since <ms>] [--limit N] [--cursor <c>] [--trader <addr> --as maker|taker]` - Your trades (all markets, or one symbol). `--trader` lists another wallet's trades (privileged, needs symbol).
+
+### Builder fees (auth required)
+
+- `dreamdex builder max-fee <symbol>` - Protocol-wide fee cap (BPS_TIMES_1K).
+- `dreamdex builder approval <symbol> --builder <addr> [--wallet <addr>]` - Show a wallet's builder approval.
+- `dreamdex builder approve <symbol> --builder <addr> --max-fee <bpsx1k>` - Approve a builder on-chain; `--max-fee 0` revokes.
+
+### Stop orders (auth required)
+
+- `dreamdex stoporder place <symbol> --side buy|sell --amount <n> --trigger-price <n> --trigger-operator gte|lte [--type market|limit] [--price <n>]` - Place a conditional stop order. `--price` required for limit type. Auto-authorizes the stop-order operator on first use.
+- `dreamdex stoporder list [symbol...] [--status pending|triggered|canceled|failed] [--limit N] [--cursor <c>]` - List stop orders across markets.
+- `dreamdex stoporder cancel <symbol> <id>` - Cancel a pending stop order on-chain.
+- `dreamdex stoporder authorization <symbol>` - Show whether the stop-order operator is authorized.
+- `dreamdex stoporder approve <symbol>` - Authorize the stop-order operator on-chain.
+
+### Vault (auth required)
+
+- `dreamdex vault balance [symbol] [--wallet <address>]` - Show vault balances. Derives address from key if omitted.
+- `dreamdex vault approve <symbol> --currency <code> --amount <n>` - Approve token spending for deposits.
+- `dreamdex vault deposit <symbol> --currency <code> --amount <n>` - Deposit tokens into vault.
+- `dreamdex vault withdraw <symbol> --currency <code> --amount <n>` - Withdraw tokens from vault.
+
+### Account & analytics (auth required)
+
+- `dreamdex portfolio [--timeframe 24h|7d|30d|all] [--session-since <ms>]` - PnL, return, volume, and fees saved.
+- `dreamdex wallet balance [wallet] [--block N]` - Wallet and vault balances per currency across markets.
+- `dreamdex wallet volume [wallet] [--since <ms>] [--until <ms>]` - Traded volume per market.
+- `dreamdex wallet smart-wallets [wallet]` - Resolve smart wallets for an EOA.
+
+### Live streaming (WebSocket)
+
+- `dreamdex watch orderbook [symbol]` - Stream order book updates.
+- `dreamdex watch trades [symbol]` - Stream trade executions.
+- `dreamdex watch candles [symbol] [--interval 1m|5m|15m|1h|4h|1d]` - Stream candle updates (default 1m).
+- `dreamdex watch order <order-id>` - Watch a specific order for status changes.
+
+All `watch` commands support `--timeout <duration>` (e.g. `30s`, `5m`) to auto-terminate.
+
+## Exit codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success |
+| 1 | User input error (bad flags, missing arguments) |
+| 2 | Authentication error (no key, bad passphrase, unauthorized) |
+| 3 | Network error (API unreachable, RPC connection failed) |
+| 4 | Chain error (tx revert, nonce, gas estimation, signing) |
+| 101 | Order not placed (e.g. IOC/FOK with no available fills) |
+| 102 | Transaction reverted on-chain (receipt status 0) |
+
+## Global flags
+
+`--json` structured JSON output | `--log-level debug|info|warn|error` | `--api-url <url>` | `--rpc-url <url>`
+
+## Common workflows
+
+```sh
+# Check price and market buy
+dreamdex ticker SOMI:SOMUSD --json
+dreamdex buy 100 SOMI:SOMUSD
+
+# Limit sell
+dreamdex sell 50 SOMI:SOMUSD --price 0.20
+
+# Vault deposit and trade
+dreamdex vault approve SOMI:SOMUSD --currency SOMUSD --amount 1000
+dreamdex vault deposit SOMI:SOMUSD --currency SOMUSD --amount 500
+dreamdex buy 100 SOMI:SOMUSD --funding-source vault
+
+# Monitor and cancel
+dreamdex order list SOMI:SOMUSD --status open --json
+dreamdex order cancel SOMI:SOMUSD <order-id>
+
+# Stream trades
+dreamdex watch trades SOMI:SOMUSD --timeout 5m
+```

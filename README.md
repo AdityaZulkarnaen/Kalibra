@@ -82,11 +82,18 @@ Nothing else is built. The adapter, the indexer, the database, the API, the web 
 and Arena do not exist yet — they are not listed above because there is nothing to claim
 about them. Rows are added as components land.
 
-The DreamDEX integration remains unverified. Documentation was located on 1 Sep 2026 and
-several unknowns are now answered on paper; none is answered by a captured payload. See
-the checklist and discovery log in [`docs/DREAMDEX_ADAPTER.md`](docs/DREAMDEX_ADAPTER.md)
-§7. The attribution plan required by day 2 is not yet decided, because the question it
-depends on (U10) is still open.
+The DreamDEX integration remains **unverified**. Documentation was located and captured on
+1 Sep 2026 — the raw pages are archived in
+[`fixtures/recorded/docs-snapshot-2026-09-01/`](fixtures/recorded/) — and most of the open
+questions now have documented answers, including the two flagged as existential. **None is
+answered by a captured API payload**, so no live claim is made anywhere in this repository
+and no adapter code has been written against it. Checklist and discovery log:
+[`docs/DREAMDEX_ADAPTER.md`](docs/DREAMDEX_ADAPTER.md) §7.
+
+The attribution plan required by day 2 is not recorded here yet. Documentation says the
+fill tape is wallet-attributed, which points at Plan A; what remains is whether that read
+is permissionless for an arbitrary wallet (U20). That is the one question still worth
+asking a human.
 
 ---
 

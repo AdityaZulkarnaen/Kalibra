@@ -19,11 +19,13 @@ export const MIN_SAMPLE = 30;
 export const ECE_BINS = 10;
 
 /**
- * Minimum stake for a position to be scored, in base units of the settlement token.
+ * Minimum stake for a position to be scored, in base units of the collateral token.
  *
- * Assumes 6 decimals (1 USDso). The token and its decimals are unverified — see
- * DREAMDEX_ADAPTER.md section 7, unknown U7. If U7 resolves to a different scale this
- * threshold is wrong by orders of magnitude, which is why it is a named constant.
+ * This literal encodes one unit at 6 decimals. Discovery (DREAMDEX_ADAPTER.md U7) found
+ * that the collateral scale is network-dependent: 6 decimals on testnet, 18 on mainnet, a
+ * factor of 10^12. The value is therefore correct where the hackathon runs and silently
+ * meaningless on mainnet. Making it scale-derived is a change to SCORING_SPEC.md section
+ * 1, which is normative, so it is escalated rather than decided here.
  */
 export const MIN_STAKE_BASE = 1_000_000n;
 
