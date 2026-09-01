@@ -1,0 +1,86 @@
+[
+  {
+    "marketId": "BTC-USD-1787616000000",
+    "outcome": "UP",
+    "settlementLevel": null,
+    "settledAt": 1787616901000,
+    "txHash": null
+  },
+  {
+    "marketId": "ETH-USD-1787616000000",
+    "outcome": "UP",
+    "settlementLevel": null,
+    "settledAt": 1787616901000,
+    "txHash": null
+  },
+  {
+    "marketId": "SOL-USD-1787616000000",
+    "outcome": "UP",
+    "settlementLevel": null,
+    "settledAt": 1787616901000,
+    "txHash": null
+  },
+  {
+    "marketId": "BTC-USD-1787616900000",
+    "outcome": "UP",
+    "settlementLevel": null,
+    "settledAt": 1787617801000,
+    "txHash": null
+  },
+  {
+    "marketId": "ETH-USD-1787616900000",
+    "outcome": "DOWN",
+    "settlementLevel": null,
+    "settledAt": 1787617801000,
+    "txHash": null
+  },
+  {
+    "marketId": "SOL-USD-1787616900000",
+    "outcome": "VOID",
+    "settlementLevel": null,
+    "settledAt": 1787617801000,
+    "txHash": null
+  },
+  {
+    "marketId": "BTC-USD-1787617800000",
+    "outcome": "DOWN",
+    "settlementLevel": null,
+    "settledAt": 1787618701000,
+    "txHash": null
+  },
+  {
+    "marketId": "ETH-USD-1787617800000",
+    "outcome": "UP",
+    "settlementLevel": null,
+    "settledAt": 1787618701000,
+    "txHash": null
+  },
+  {
+    "marketId": "SOL-USD-1787617800000",
+    "outcome": "DOWN",
+    "settlementLevel": null,
+    "settledAt": 1787618701000,
+    "txHash": null
+  },
+  {
+    "marketId": "BTC-USD-1787618700000",
+    "outcome": "DOWN",
+    "settlementLevel": null,
+    "settledAt": 1787619601000,
+    "txHash": null
+  },
+  {
+    "marketId": "ETH-USD-1787618700000",
+    "outcome": "UP",
+    "settlementLevel": null,
+    "settledAt": 1787619601000,
+    "txHash": null
+  },
+  {
+    "marketId": "SOL-USD-1787618700000",
+    "outcome": "UP",
+    "settlementLevel": null,
+    "settledAt": 1787619601000,
+    "txHash": null
+  }
+]

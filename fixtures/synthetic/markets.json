@@ -1,0 +1,110 @@
+[
+  {
+    "marketId": "BTC-USD-1787616000000",
+    "underlying": "BTC-USD",
+    "windowStart": 1787616000000,
+    "windowEnd": 1787616900000,
+    "strike": null,
+    "strikeDecimals": 0,
+    "status": "SETTLED"
+  },
+  {
+    "marketId": "ETH-USD-1787616000000",
+    "underlying": "ETH-USD",
+    "windowStart": 1787616000000,
+    "windowEnd": 1787616900000,
+    "strike": null,
+    "strikeDecimals": 0,
+    "status": "SETTLED"
+  },
+  {
+    "marketId": "SOL-USD-1787616000000",
+    "underlying": "SOL-USD",
+    "windowStart": 1787616000000,
+    "windowEnd": 1787616900000,
+    "strike": null,
+    "strikeDecimals": 0,
+    "status": "SETTLED"
+  },
+  {
+    "marketId": "BTC-USD-1787616900000",
+    "underlying": "BTC-USD",
+    "windowStart": 1787616900000,
+    "windowEnd": 1787617800000,
+    "strike": null,
+    "strikeDecimals": 0,
+    "status": "SETTLED"
+  },
+  {
+    "marketId": "ETH-USD-1787616900000",
+    "underlying": "ETH-USD",
+    "windowStart": 1787616900000,
+    "windowEnd": 1787617800000,
+    "strike": null,
+    "strikeDecimals": 0,
+    "status": "SETTLED"
+  },
+  {
+    "marketId": "SOL-USD-1787616900000",
+    "underlying": "SOL-USD",
+    "windowStart": 1787616900000,
+    "windowEnd": 1787617800000,
+    "strike": null,
+    "strikeDecimals": 0,
+    "status": "VOID"
+  },
+  {
+    "marketId": "BTC-USD-1787617800000",
+    "underlying": "BTC-USD",
+    "windowStart": 1787617800000,
+    "windowEnd": 1787618700000,
+    "strike": null,
+    "strikeDecimals": 0,
+    "status": "SETTLED"
+  },
+  {
+    "marketId": "ETH-USD-1787617800000",
+    "underlying": "ETH-USD",
+    "windowStart": 1787617800000,
+    "windowEnd": 1787618700000,
+    "strike": null,
+    "strikeDecimals": 0,
+    "status": "SETTLED"
+  },
+  {
+    "marketId": "SOL-USD-1787617800000",
+    "underlying": "SOL-USD",
+    "windowStart": 1787617800000,
+    "windowEnd": 1787618700000,
+    "strike": null,
+    "strikeDecimals": 0,
+    "status": "SETTLED"
+  },
+  {
+    "marketId": "BTC-USD-1787618700000",
+    "underlying": "BTC-USD",
+    "windowStart": 1787618700000,
+    "windowEnd": 1787619600000,
+    "strike": null,
+    "strikeDecimals": 0,
+    "status": "SETTLED"
+  },
+  {
+    "marketId": "ETH-USD-1787618700000",
+    "underlying": "ETH-USD",
+    "windowStart": 1787618700000,
+    "windowEnd": 1787619600000,
+    "strike": null,
+    "strikeDecimals": 0,
+    "status": "SETTLED"
+  },
+  {
+    "marketId": "SOL-USD-1787618700000",
+    "underlying": "SOL-USD",
+    "windowStart": 1787618700000,
+    "windowEnd": 1787619600000,
+    "strike": null,
+    "strikeDecimals": 0,
+    "status": "SETTLED"
+  }
+]
