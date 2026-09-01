@@ -1,0 +1,14 @@
+{
+  "name": "@kalibra/adapter-dreamdex",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@kalibra/core": "workspace:*",
+    "zod": "^4.5.4"
+  }
+}
