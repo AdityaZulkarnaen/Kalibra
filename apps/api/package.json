@@ -5,7 +5,8 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/lib.ts"
+    ".": "./src/lib.ts",
+    "./schemas": "./src/schemas.ts"
   },
   "dependencies": {
     "@kalibra/core": "workspace:*",

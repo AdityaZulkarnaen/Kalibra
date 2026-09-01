@@ -87,7 +87,14 @@ const NO_VENUE_ENDPOINT = {
 
 export default tseslint.config(
   {
-    ignores: ['node_modules/**', 'dist/**', 'coverage/**', '**/__fixtures__/**'],
+    ignores: [
+      'node_modules/**',
+      'dist/**',
+      'coverage/**',
+      '**/__fixtures__/**',
+      'apps/web/.next/**',
+      'apps/web/next-env.d.ts',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -106,7 +113,9 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.ts', '**/*.js'],
+    // .tsx and .mjs are listed so the airlock rule reaches apps/web too: a pasted venue
+    // URL in a component is exactly the leak I2 exists to catch.
+    files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.mjs'],
     ignores: ['packages/adapter-dreamdex/**'],
     rules: {
       'no-restricted-syntax': ['error', NO_VENUE_ENDPOINT],

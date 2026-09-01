@@ -7,7 +7,7 @@
     "node": ">=20.11.0"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -18,15 +18,20 @@
     "generate-fixtures": "tsx scripts/generate-fixtures.ts",
     "ingest": "tsx apps/indexer/src/index.ts",
     "api": "tsx apps/api/src/index.ts",
-    "record": "tsx scripts/record.ts"
+    "record": "tsx scripts/record.ts",
+    "web": "pnpm --filter @kalibra/web dev",
+    "web:build": "pnpm --filter @kalibra/web build"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@testing-library/react": "^16.3.3",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.4.0",
+    "@vitejs/plugin-react": "^6.1.1",
     "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.11.0",
+    "jsdom": "^30.0.1",
     "prettier": "^3.9.6",
     "tsx": "^4.23.13",
     "typescript": "^5.9.3",
@@ -35,14 +40,14 @@
   },
   "dependencies": {
     "@kalibra/adapter-dreamdex": "workspace:*",
+    "@kalibra/api": "workspace:*",
     "@kalibra/core": "workspace:*",
     "@kalibra/db": "workspace:*",
     "@kalibra/indexer": "workspace:*",
     "better-sqlite3": "^13.0.3",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.12.1",
-    "zod": "^4.5.4",
-    "@kalibra/api": "workspace:*"
+    "zod": "^4.5.4"
   },
   "packageManager": "pnpm@11.24.0"
 }

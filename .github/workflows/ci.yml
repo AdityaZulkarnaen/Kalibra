@@ -24,3 +24,7 @@ jobs:
 
       # typecheck, lint, format, tests, and the offline demo.
       - run: pnpm verify
+
+      # The web app is a separate compile. It downloads no webfont and reads no API at
+      # build time, so this step needs no running server.
+      - run: pnpm web:build

@@ -8,3 +8,7 @@ fixtures/
 # noise in every diff and risks touching the numeric tables.
 *.md
 docs/
+
+# Next build output.
+apps/web/.next/
+apps/web/next-env.d.ts
