@@ -5,6 +5,7 @@ import { openDatabase } from '@kalibra/db';
 
 import { loadConfig } from './config.js';
 import { formatSummary, runIngest } from './ingest.js';
+import { runPipeline } from './pipeline.js';
 
 /**
  * `pnpm ingest`. Replay mode reads the committed fixtures and needs no network and no
@@ -22,9 +23,17 @@ async function main(): Promise<void> {
   const adapter = await ReplayAdapter.fromDirectory(join(process.cwd(), 'fixtures', 'synthetic'));
   const { db, close } = openDatabase(config.KALIBRA_DB_PATH);
   try {
-    const summary = await runIngest(adapter, db, { ingestedAt: Date.now() });
+    const now = Date.now();
+    const summary = await runIngest(adapter, db, { ingestedAt: now });
     console.log(`replay -> ${config.KALIBRA_DB_PATH}`);
     console.log(formatSummary(summary));
+
+    const pipeline = runPipeline(db, { computedAt: now });
+    console.log(
+      `positions    ${pipeline.positionsScored} scored, ${pipeline.positionsExcluded} excluded`,
+    );
+    console.log(`wallets      ${pipeline.walletsSeen} seen, ${pipeline.walletsRanked} RANKED`);
+    console.log(`params       ${pipeline.paramsHash}`);
   } finally {
     close();
   }

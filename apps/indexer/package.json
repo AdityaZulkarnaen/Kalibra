@@ -8,5 +8,9 @@
     "@kalibra/core": "workspace:*",
     "@kalibra/db": "workspace:*",
     "zod": "^4.5.4"
-  }
+  },
+  "exports": {
+    ".": "./src/lib.ts"
+  },
+  "sideEffects": false
 }
