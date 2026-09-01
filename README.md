@@ -72,15 +72,20 @@ Somnia interaction with a transaction hash or a captured response in `fixtures/`
 `REPLAY` means recorded real data; `SYNTHETIC` means generated data with the real
 integration unverified; `STUB` means the interface exists and the implementation does not.
 
-**As of day 1 of nine (`docs/BUILD_PLAN.md`), one component exists.**
+**As of day 2 of nine (`docs/BUILD_PLAN.md`).** Nothing below has touched real market data.
 
 | Component | Status | Evidence |
 |---|---|---|
-| Kalibra Score math (`packages/core`) | SYNTHETIC | Test vectors V1, V2, V3 and V6 from `docs/SCORING_SPEC.md` §8 are implemented and green. V1 anchors at exactly 500 and V3 at 528. No market data has passed through it. |
+| Kalibra Score math (`packages/core`) | SYNTHETIC | Every numeric vector in `docs/SCORING_SPEC.md` §8 — V1, V2, V3, V4, V5, V6 — implemented and green. V1 anchors at exactly 500, V3 scores 528, V4 scores 557, and V5 is strictly monotone across all six edge thresholds. |
+| Canonical types and Zod schemas (`packages/adapter-dreamdex`) | SYNTHETIC | Every fixture is parsed by the same schemas a live payload would meet; a checksummed address, an out-of-range probability or a float stake is rejected rather than coerced. The mapping to real venue fields is unverified — `docs/DREAMDEX_ADAPTER.md` §6 has no Verified row. |
+| `ReplayAdapter` | SYNTHETIC | Streams the 12 markets, 681 trades and 12 settlements in `fixtures/synthetic/`. Deliberately **not** labelled REPLAY: that data is generated, not recorded. |
+| `LiveAdapter` | STUB | The `DreamDexAdapter` interface exists; `live.ts` does not. Day 4. No API payload has been captured, and live mode refuses to start rather than pretending. |
+| Persistence (`packages/db`) | SYNTHETIC | Schema extracted verbatim from `docs/API_SPEC.md` §1 into plain SQL and applied to SQLite; a test asserts the Drizzle mirror names exactly the columns the SQL creates. Only synthetic rows have passed through it. |
+| Ingestion (`apps/indexer`) | SYNTHETIC | Ingests every fixture, and a second run inserts zero rows. Replay only. |
 
-Nothing else is built. The adapter, the indexer, the database, the API, the web app, Guard
-and Arena do not exist yet — they are not listed above because there is nothing to claim
-about them. Rows are added as components land.
+The scoring pipeline, the public API, the web app, Guard and Arena do not exist yet, so
+they are not listed — there is nothing to claim about them. Rows are added as components
+land.
 
 The DreamDEX integration remains **unverified**. Documentation was located and captured on
 1 Sep 2026 — the raw pages are archived in
