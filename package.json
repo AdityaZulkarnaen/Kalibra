@@ -14,10 +14,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "demo": "tsx scripts/demo.ts",
-    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm demo"
+    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm demo",
+    "generate-fixtures": "tsx scripts/generate-fixtures.ts",
+    "ingest": "tsx apps/indexer/src/index.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.4.0",
     "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
@@ -29,7 +32,11 @@
     "vitest": "^4.1.11"
   },
   "dependencies": {
-    "@kalibra/core": "workspace:*"
+    "@kalibra/core": "workspace:*",
+    "better-sqlite3": "^13.0.3",
+    "drizzle-orm": "^0.45.2",
+    "zod": "^4.5.4",
+    "@kalibra/adapter-dreamdex": "workspace:*"
   },
   "packageManager": "pnpm@11.24.0"
 }
