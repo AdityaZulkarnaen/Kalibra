@@ -1,3 +1,4 @@
+export * from './guard-queries.js';
 export * from './migrate.js';
 export * from './pipeline-queries.js';
 export * from './read-queries.js';

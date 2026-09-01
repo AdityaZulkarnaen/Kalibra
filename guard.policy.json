@@ -1,0 +1,15 @@
+{
+  "policyId": "demo-conservative",
+  "version": 1,
+  "maxNotionalPerOrder": "50000000",
+  "maxOpenNotional": "200000000",
+  "maxDailyLoss": "100000000",
+  "maxOrdersPerWindow": 10,
+  "rateWindowMs": 60000,
+  "lossStreakThreshold": 3,
+  "cooldownMs": 300000,
+  "allowedMarkets": [],
+  "minTimeToCloseMs": 5000,
+  "killSwitch": false,
+  "autoKillOnDailyLoss": true
+}

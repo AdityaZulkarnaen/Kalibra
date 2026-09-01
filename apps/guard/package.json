@@ -1,0 +1,18 @@
+{
+  "name": "@kalibra/guard",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/lib.ts"
+  },
+  "dependencies": {
+    "@kalibra/adapter-dreamdex": "workspace:*",
+    "@kalibra/core": "workspace:*",
+    "@kalibra/db": "workspace:*",
+    "@kalibra/indexer": "workspace:*",
+    "fastify": "^5.7.1",
+    "zod": "^4.5.4"
+  }
+}
