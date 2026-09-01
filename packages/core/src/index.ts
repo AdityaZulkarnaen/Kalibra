@@ -1,3 +1,5 @@
+export * from './aggregate.js';
+export * from './audit.js';
 export * from './brier.js';
 export * from './calibration.js';
 export * from './constants.js';
@@ -6,5 +8,6 @@ export * from './discrimination.js';
 export * from './errors.js';
 export * from './forecast.js';
 export * from './lcg.js';
+export * from './params.js';
 export * from './score.js';
 export * from './types.js';
