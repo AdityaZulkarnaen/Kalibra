@@ -1,0 +1,12 @@
+{
+  "name": "@kalibra/indexer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@kalibra/adapter-dreamdex": "workspace:*",
+    "@kalibra/core": "workspace:*",
+    "@kalibra/db": "workspace:*",
+    "zod": "^4.5.4"
+  }
+}
