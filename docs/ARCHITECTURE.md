@@ -297,6 +297,7 @@ DREAMDEX_API_KEY=                unverified whether required
 SOMNIA_RPC_URL=
 GUARD_WALLET_PRIVATE_KEY=        guard only, never logged
 API_PORT=3001
+KALIBRA_API_URL=http://127.0.0.1:3001   apps/web reads the index from here
 WEB_PORT=3000
 ```
 

@@ -52,10 +52,17 @@ as an MCP server, so any LLM agent can trade inside guaranteed risk bounds.
 ```bash
 pnpm install
 pnpm test          # all unit tests, no network required
-pnpm demo          # deterministic offline run — scoring core only today, see the table below
+pnpm demo          # deterministic offline run — the full pipeline, see the table below
 pnpm typecheck     # tsc, strict
 pnpm lint          # eslint, including the rules that enforce CLAUDE.md I1 and I2
-# pnpm dev         # live mode against Somnia testnet — not implemented yet, day 4
+```
+
+To browse the index instead of reading a summary of it, run the three pieces in order:
+
+```bash
+pnpm ingest        # fixtures -> ./kalibra.db  (KALIBRA_MODE=live reads the testnet instead)
+pnpm api           # read-only HTTP on :3001
+pnpm web           # Next.js on :3000, reading that API and nothing else
 ```
 
 `pnpm demo` is the canonical entry point for reviewers. It must succeed on a clean
@@ -72,7 +79,8 @@ Somnia interaction with a transaction hash or a captured response in `fixtures/`
 `REPLAY` means recorded real data; `SYNTHETIC` means generated data with the real
 integration unverified; `STUB` means the interface exists and the implementation does not.
 
-**As of day 4 of nine, complete (`docs/BUILD_PLAN.md`).** Nothing below has touched real market data.
+**As of day 5 of nine, complete (`docs/BUILD_PLAN.md`).** One row below is `LIVE`; the rest
+run on generated data.
 
 | Component | Status | Evidence |
 |---|---|---|
@@ -84,10 +92,11 @@ integration unverified; `STUB` means the interface exists and the implementation
 | Persistence (`packages/db`) | SYNTHETIC | Schema extracted verbatim from `docs/API_SPEC.md` §1 into plain SQL and applied to SQLite; a test asserts the Drizzle mirror names exactly the columns the SQL creates. |
 | Ingestion and scoring pipeline (`apps/indexer`) | SYNTHETIC | Ingests every fixture, aggregates 1,112 positions, scores 861 of them, and writes 25 score rows with 250 calibration bins. A second run changes nothing. |
 | Public read API (`apps/api`) | SYNTHETIC | Every endpoint in `docs/API_SPEC.md` §2, with responses parsed by their published Zod schema before they are sent in test mode. The example payloads in that document are parsed by the same schemas, so the spec and the server cannot drift apart without a test failing. |
+| Web app (`apps/web`) | SYNTHETIC | Leaderboard and `/w/:address` profile, rendered per request from `apps/api` with no hardcoded, cached or fallback data — verified by killing the API and confirming the page shows an error rather than numbers. The data it displays is the synthetic fixture set. |
 | `pnpm demo` | SYNTHETIC | Runs the whole pipeline offline into an in-memory database and asserts the result byte-for-byte against `fixtures/expected/demo-output.json`. |
 
-The web app, Guard and Arena do not exist yet, so they are not listed — there is nothing to
-claim about them. Rows are added as components land.
+Guard and Arena do not exist yet, so they are not listed — there is nothing to claim about
+them. Rows are added as components land.
 
 ### What "LIVE" means here, and what it does not
 
@@ -117,6 +126,19 @@ sub-minimum-stake wallets, and that is the product's central claim made visible:
 nets to zero stake, so it expresses no directional view, so it is excluded and cannot
 manufacture a sample count. **Gaming the metric converges to the metric's null value.**
 
+### The calibration curve
+
+The chart on a profile page plots each confidence band's mean forecast against how often
+those forecasts came true, with the diagonal drawn for reference. Its plot area is a fixed
+square rather than a responsive rectangle, because the diagonal only means perfect
+calibration when the axes are scaled alike; stretched to fit a container it becomes a slope
+that means nothing.
+
+Bands the trader never forecast in are gaps in the curve, not points interpolated between
+their neighbours, and the bin table underneath shows the counts so a gap can be told from a
+rendering fault. A `PROVISIONAL` wallet shows its status and sample count where the score
+would be, never a number.
+
 `docs/DREAMDEX_ADAPTER.md` §9 originally specified 12 markets, which could not work:
 aggregation keeps one position per wallet per market, so twelve markets capped every wallet
 at twelve resolved positions while `MIN_SAMPLE` is 30, and nobody could ever be ranked. The
@@ -131,9 +153,9 @@ explaining what each byte establishes. Eleven questions in
 capture, including both that were marked existential: fills carry `maker` and `taker`
 addresses, and reading another wallet's fills needs no key.
 
-No code talks to the venue yet — `LiveAdapter` is still unwritten, so nothing in the
-real-vs-mocked table above claims LIVE. What the capture bought is a mapping table with
-verified rows instead of guesses.
+That capture is what `LiveAdapter` was written against, and it is the evidence behind the
+one `LIVE` row in the table above. What it bought is a mapping table with verified rows
+instead of guesses.
 
 ---
 
