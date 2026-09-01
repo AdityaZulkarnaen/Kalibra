@@ -281,7 +281,7 @@ code without a fallback.
 | U15 | `OrderFilled` carries taker and maker order ids, not addresses | A raw-chain path needs a join from fill back to placement to recover the owner | DOC — confirmed against the events page, and **no longer on the critical path** for the same reason as U14 |
 | U16 | `loadMarkets()` omits settled markets | Settled markets — the only scoreable ones — would be invisible to the indexer | DOC — use `listPastBinaryMarkets({ status: "Finalized" })`. Note `Resolved` returns an empty list, because resolution auto-finalizes |
 | U17 | Somnia testnet chain id and RPC URL | Cannot point viem at the right chain | DOC-partial — testnet is Somnia Shannon, chain id **50312** (mainnet 5031), explorer `shannon-explorer.somnia.network`. Protocol addresses are identical on both networks via CREATE3. The testnet RPC URL itself was not on any page read |
-| U18 | `SCORING_SPEC.md` §2 wants the **mid at execution**, but the venue serves a fill tape and derivable order rows, not a mid time series | Using the fill price instead conflates forecasting skill with execution quality — the exact error §2 exists to prevent | OPEN — **a design decision, not a lookup.** Options: reconstruct the book from order rows at each fill's block; use the enclosing candle; or accept `quote_source = 'LAST'` and say so in the UI. Decide before the scoring pipeline lands |
+| U18 | `SCORING_SPEC.md` §2 wants the **mid at execution**, but the venue serves a fill tape and derivable order rows, not a mid time series | Using the fill price instead conflates forecasting skill with execution quality — the exact error §2 exists to prevent | **DECIDED 1 Sep 2026: reconstruct the book.** See 7.2 |
 | U19 | The `indexerUrl` the SDK client is constructed with | Without it `LiveAdapter` cannot be constructed at all | OPEN — the documentation site shows `new SomniaMarkets({ indexerUrl, chain, wsRpcUrl, addresses, privateKey })` but never gives the value; it points to the package README on npm |
 | U20 | Is `getUserFills(account)` permissionless for an arbitrary wallet, or only for one's own | If privileged, U10 collapses back to Plan B or C and the leaderboard covers registered wallets only | OPEN — **the one that still matters.** The spot CLI marks its equivalent (`mytrades --trader <addr>`) as privileged; the event-contract SDK documentation marks `getUserFills` as neither. Do not assume |
 | U21 | How a mint-a-pair fill appears in the tape | Buy Up × Buy Down crosses with no seller and the pool mints a fresh pair. If it is one row, side attribution for one of the two counterparties is ambiguous | OPEN — affects `CanonicalTrade` construction and therefore §4.1 aggregation |
@@ -338,6 +338,33 @@ This directly concerns `MIN_STAKE_BASE` in `SCORING_SPEC.md` §1, which assumes 
 for testnet, wrong by 10^12 for mainnet. Testnet collateral has no faucet page: the token
 mints on demand via `faucet(uint256)`, capped at 10,000 tUSDC, crediting `msg.sender`. STT
 for gas comes from the Somnia testnet faucet.
+
+### 7.2 Decision on U18 — the quote source
+
+`LiveAdapter` reconstructs the order book at each fill's block and takes the **mid**, per
+`SCORING_SPEC.md` §2. It does not use the fill price.
+
+Every resting order carries `placedAtBlock` and `lastUpdatedAtBlock`, so the set of orders
+alive at a given block is derivable: take every order placed at or before that block whose
+last update is after it, split by side, and the best bid and best ask give the mid. Fills
+carry `blockNumber` and `logIndex`, so each one has an exact block to reconstruct against.
+
+The cheaper path was available and was **not** taken. §2 permits falling back to the last
+trade price with `quote_source = 'LAST'`, and that would have cost almost nothing. It was
+rejected because the fill price is the trader's own execution, so a trader who crosses a
+wide spread would be scored as making a more extreme forecast than they actually made —
+the precise error §2 exists to prevent, and one that is invisible in the output.
+
+Consequences, stated plainly:
+
+- This is the expensive option. It is roughly a day of adapter work and it is the reason
+  `LiveAdapter` is the largest single piece of remaining risk.
+- It depends on venue behaviour that is documented but **not captured** (U19, U20). If the
+  order rows turn out not to carry what the documentation says, the fallback is
+  `quote_source = 'LAST'`, and that degradation must be visible in the data and stated in
+  the UI rather than absorbed silently.
+- Replay mode is unaffected. Synthetic fixtures carry `quoteSource: 'MID'` by construction,
+  so nothing already built changes.
 
 **(g) Still needs a human.** The six questions of §5 Step 2 in the hackathon Telegram —
 now reducible to essentially one, U20 — and a funded testnet wallet. Both require an
