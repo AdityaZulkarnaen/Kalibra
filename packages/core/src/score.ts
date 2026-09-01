@@ -5,9 +5,11 @@ import {
   expectedCalibrationError,
 } from './calibration.js';
 import { MIN_SAMPLE, SCORE_ANCHOR, SCORE_MAX, SCORE_MIN, W_BSS, W_ECE } from './constants.js';
+import { convictionSeries } from './conviction.js';
 import { rocAuc } from './discrimination.js';
 import { InvalidInputError, assertFinite } from './errors.js';
-import type { ForecastObservation, OutcomeY, WalletMetrics, WalletStatus } from './types.js';
+import { computeForecast } from './forecast.js';
+import type { ForecastObservation, OutcomeY, Side, WalletMetrics, WalletStatus } from './types.js';
 
 /**
  * SCORING_SPEC.md section 6. Math.round rounds half toward positive infinity, which
@@ -116,4 +118,58 @@ function emptyMetrics(): WalletMetrics {
     status: walletStatus(0),
     calibration: calibrationBins([], []),
   };
+}
+
+/** One resolved, scoreable position. Excluded positions never reach this function. */
+export interface ScorablePosition {
+  readonly positionId: string;
+  readonly side: Side;
+  /** Clamped market-implied P(UP). */
+  readonly p: number;
+  readonly stake: bigint;
+  readonly y: OutcomeY;
+  readonly settledAt: number;
+}
+
+export interface ScoredPosition extends ScorablePosition {
+  readonly lambda: number;
+  readonly forecast: number;
+}
+
+export interface WalletScore {
+  readonly metrics: WalletMetrics;
+  /** In the order the pipeline scored them, which is the order section 7 fixes. */
+  readonly positions: readonly ScoredPosition[];
+}
+
+/**
+ * SCORING_SPEC.md section 7, in order.
+ *
+ * The sort is not a convenience. Lambda depends on the trailing window of a wallet's own
+ * history, so a different order produces different forecasts and therefore different
+ * scores — which is why invariant I6 forbids relying on database or map ordering.
+ */
+export function scoreWallet(positions: readonly ScorablePosition[]): WalletScore {
+  const ordered = [...positions].sort(
+    (a, b) =>
+      a.settledAt - b.settledAt ||
+      (a.positionId < b.positionId ? -1 : a.positionId > b.positionId ? 1 : 0),
+  );
+
+  const lambdas = convictionSeries(ordered.map((position) => position.stake));
+  const scored: ScoredPosition[] = ordered.map((position, i) => {
+    const lambda = lambdas[i];
+    if (lambda === undefined) {
+      throw new InvalidInputError(`conviction missing for position ${position.positionId}`);
+    }
+    return { ...position, lambda, forecast: computeForecast(position.p, position.side, lambda) };
+  });
+
+  const observations: ForecastObservation[] = scored.map((position) => ({
+    p: position.p,
+    f: position.forecast,
+    y: position.y,
+  }));
+
+  return { metrics: computeWalletMetrics(observations), positions: scored };
 }
