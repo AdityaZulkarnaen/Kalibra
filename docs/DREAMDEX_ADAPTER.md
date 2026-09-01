@@ -347,6 +347,16 @@ account the agent does not have.
 
 ## 8. Contingency for U10
 
+> **Decided 1 Sep 2026: Plan A is in effect.** U10 came back documented — the venue's own
+> indexer serves a wallet-attributed fill tape, pool-wide and filtered per account — so
+> attribution does not need the raw-log route this section was written to anticipate.
+> Plan A therefore means *read the indexer's fill tape*, which is cheaper than the on-chain
+> decoding described below; the log path stays documented as the fallback if the indexer
+> read turns out to be privileged (U20). Plan C remains the floor. Also decided: the
+> project targets **Somnia Shannon testnet only** (chain id 50312), which fixes the
+> collateral scale at six decimals and makes `MIN_STAKE_BASE` correct as written — see U7.
+> Both decisions are recorded in the README.
+
 If the public trade feed does not attribute trades to wallet addresses, the design as
 written cannot work. Do not improvise. The fallback, in order of preference:
 

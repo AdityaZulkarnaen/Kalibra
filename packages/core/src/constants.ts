@@ -21,11 +21,11 @@ export const ECE_BINS = 10;
 /**
  * Minimum stake for a position to be scored, in base units of the collateral token.
  *
- * This literal encodes one unit at 6 decimals. Discovery (DREAMDEX_ADAPTER.md U7) found
- * that the collateral scale is network-dependent: 6 decimals on testnet, 18 on mainnet, a
- * factor of 10^12. The value is therefore correct where the hackathon runs and silently
- * meaningless on mainnet. Making it scale-derived is a change to SCORING_SPEC.md section
- * 1, which is normative, so it is escalated rather than decided here.
+ * This literal encodes one unit at 6 decimals, which is the testnet collateral scale.
+ * Mainnet collateral carries 18 decimals (DREAMDEX_ADAPTER.md U7), where the same literal
+ * would be wrong by a factor of 10^12 with nothing reverting to say so. The project
+ * deliberately targets testnet only, so the literal stands and the constraint is recorded
+ * as a limitation in the README rather than engineered around.
  */
 export const MIN_STAKE_BASE = 1_000_000n;
 

@@ -97,6 +97,28 @@ asking a human.
 
 ---
 
+## Decisions in effect
+
+**Attribution: Plan A** (`docs/DREAMDEX_ADAPTER.md` §8). Kalibra reads fills from the
+venue's own indexer, which serves a wallet-attributed fill tape — a pool-wide tape and the
+same tape filtered to one account. That is cheaper and more direct than decoding raw chain
+logs, which carry order ids rather than addresses and would need a join back to the
+placement to recover an owner.
+
+The open risk is whether reading another wallet's fills is permissionless (`U20`). If it
+turns out to be privileged, Plan A degrades to Plan B (opt-in registration) and Plan C
+(Arena-only, where Guard placed the order and attribution is guaranteed) remains the
+floor. The project cannot fail to ship, only ship smaller.
+
+**Network: Somnia Shannon testnet only**, chain id 50312. `MIN_STAKE_BASE` stays a literal
+at six decimals, which is correct for the testnet collateral token. Mainnet collateral
+carries eighteen decimals, so the same literal would be wrong by a factor of 10^12 there —
+and nothing would revert to say so. Kalibra does not target mainnet, and this is recorded
+as a limitation rather than engineered around. It joins the known-limitations list copied
+verbatim from `docs/PRD.md` §9 into this README on day 8.
+
+---
+
 ## Document index
 
 Read in this order.
