@@ -30,6 +30,21 @@ export function kalibraScore(bssShrunk: number, eceExcess: number): number {
   return Math.min(Math.max(rounded, SCORE_MIN), SCORE_MAX);
 }
 
+/**
+ * Round to a fixed number of decimals under the same half-away-from-zero rule. Used by the
+ * V4 generator and by fixture generation, which must agree to the last bit.
+ */
+export function roundTo(value: number, decimals: number): number {
+  if (!Number.isFinite(value)) {
+    throw new InvalidInputError(`value must be finite, received ${value}`);
+  }
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 15) {
+    throw new InvalidInputError(`decimals must be an integer in [0, 15], received ${decimals}`);
+  }
+  const factor = 10 ** decimals;
+  return roundHalfAwayFromZero(value * factor) / factor;
+}
+
 /** SCORING_SPEC.md section 6.1. */
 export function walletStatus(n: number): WalletStatus {
   if (!Number.isInteger(n) || n < 0) {

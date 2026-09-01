@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { brierSkillScore, shrinkSkillScore } from './brier.js';
-import { ECE_BINS, PROB_MAX, PROB_MIN } from './constants.js';
+import { ECE_BINS, LAMBDA_MAX, PROB_MAX, PROB_MIN } from './constants.js';
 import { clampProbability, computeForecast } from './forecast.js';
-import { computeWalletMetrics } from './score.js';
+import { createLcg } from './lcg.js';
+import { computeWalletMetrics, roundTo } from './score.js';
 import type { ForecastObservation, OutcomeY, Side } from './types.js';
 
 /**
@@ -95,6 +96,90 @@ describe('V3 — four positions, full pipeline', () => {
     expect(occupied[0]?.meanForecast).toBeCloseTo(0.2375, 9);
     expect(occupied[1]).toMatchObject({ count: 1, meanForecast: 0.75, observedFrequency: 1 });
     expect(occupied[2]).toMatchObject({ count: 1, meanForecast: 0.8, observedFrequency: 1 });
+  });
+});
+
+/**
+ * SCORING_SPEC.md section 8, V4 and V5. The rows are generated rather than tabulated, so
+ * the vector can be reproduced in any language from the seed alone. Draws happen in
+ * exactly the published order — p, then side, then hit — and changing that order silently
+ * changes every number below.
+ */
+const generateVector = (edge: number, n = 60): ForecastObservation[] => {
+  const rng = createLcg(42);
+  const rows: ForecastObservation[] = [];
+  for (let i = 0; i < n; i += 1) {
+    const p = roundTo(0.3 + 0.4 * rng.unit(), 4);
+    const side: Side = rng.unit() < 0.5 ? 'UP' : 'DOWN';
+    const hit = rng.unit() < edge;
+    const y: OutcomeY = hit ? (side === 'UP' ? 1 : 0) : side === 'UP' ? 0 : 1;
+    rows.push({ p, f: computeForecast(p, side, LAMBDA_MAX), y });
+  }
+  return rows;
+};
+
+describe('V4 — sixty positions, ranked', () => {
+  const rows = generateVector(0.58);
+  const metrics = computeWalletMetrics(rows);
+
+  it('reproduces the six published rows, which pins the generator', () => {
+    const first = rows.slice(0, 6).map((row) => ({ p: row.p, y: row.y }));
+    expect(first).toEqual([
+      { p: 0.4009, y: 1 },
+      { p: 0.389, y: 1 },
+      { p: 0.4789, y: 0 },
+      { p: 0.6979, y: 0 },
+      { p: 0.5568, y: 1 },
+      { p: 0.3363, y: 0 },
+    ]);
+  });
+
+  it('matches every quoted statistic', () => {
+    expect(metrics.n).toBe(60);
+    expect(metrics.bsTrader).toBeCloseTo(0.269694941, 9);
+    expect(metrics.bsMarket).toBeCloseTo(0.2850730973333333, 9);
+    expect(metrics.bss).toBeCloseTo(0.05394460746098306, 9);
+    expect(metrics.bssShrunk).toBeCloseTo(0.03807854644304687, 9);
+    expect(metrics.eceTrader).toBeCloseTo(0.15024166666666666, 9);
+    expect(metrics.eceMarket).toBeCloseTo(0.1848066666666667, 9);
+    expect(metrics.auc).toBeCloseTo(0.5656108597285068, 9);
+  });
+
+  it('earns its score from skill alone — this trader beats the market on calibration', () => {
+    expect(metrics.eceExcess).toBe(0);
+  });
+
+  it('scores 557 and is RANKED at n = 60, so the score is published', () => {
+    expect(metrics.scoreInternal).toBe(557);
+    expect(metrics.status).toBe('RANKED');
+    expect(metrics.score).toBe(557);
+  });
+});
+
+describe('V5 — monotonicity in edge', () => {
+  const table: ReadonlyArray<readonly [number, number]> = [
+    [0.4, 63],
+    [0.5, 351],
+    [0.55, 393],
+    [0.58, 557],
+    [0.65, 767],
+    [0.75, 859],
+  ];
+
+  it.each(table)('edge %s scores %i', (edge, expected) => {
+    expect(computeWalletMetrics(generateVector(edge)).score).toBe(expected);
+  });
+
+  it('never lets a trader who is right more often score lower', () => {
+    const scores = table.map(([edge]) => computeWalletMetrics(generateVector(edge)).score);
+    for (let i = 1; i < scores.length; i += 1) {
+      expect(scores[i]).toBeGreaterThan(scores[i - 1] as number);
+    }
+  });
+
+  it('scores a confident coin-flipper below the anchor, which is the point', () => {
+    const coinFlipper = computeWalletMetrics(generateVector(0.5)).score;
+    expect(coinFlipper).toBeLessThan(500);
   });
 });
 
