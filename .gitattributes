@@ -1,0 +1,7 @@
+# Prettier is configured for LF. Without this, Windows checkouts get CRLF and
+# `pnpm format:check` fails on a clean clone while passing in CI.
+* text=auto eol=lf
+
+# Captured evidence. Never normalise: the point of these files is that the bytes
+# are exactly what the server sent.
+fixtures/recorded/** -text
