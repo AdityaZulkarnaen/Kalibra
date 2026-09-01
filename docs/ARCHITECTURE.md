@@ -135,6 +135,13 @@ adapter.streamTrades()
 
 Settlements follow the same path into `settlements`.
 
+> **Contradiction, noted 1 Sep 2026.** `API_SPEC.md` §1 defines no `settlements` table —
+> a resolution lives in `outcome`, `settlement_level`, `settled_at` and `settle_tx_hash`
+> on `markets`. Per `CLAUDE.md` §9 the more specific document wins, so the implementation
+> follows `API_SPEC.md` and a settlement is an UPDATE on `markets`. A settlement for an
+> unknown market therefore has nowhere to land: the indexer counts and warns rather than
+> fabricating a market row from it.
+
 Idempotency matters because a WebSocket reconnect will replay messages. Every insert is
 keyed on a natural identifier from the source and ignores duplicates. This also makes the
 whole pipeline safely re-runnable, which the demo depends on.
