@@ -11,6 +11,10 @@ import { z } from 'zod';
 export const configSchema = z.object({
   KALIBRA_MODE: z.enum(['replay', 'live']).default('replay'),
   KALIBRA_DB_PATH: z.string().min(1).default('./kalibra.db'),
+  /** Required only in live mode. No default: replay must never silently reach a network. */
+  DREAMDEX_INDEXER_URL: z.string().url().optional(),
+  /** Live mode reads orders per market to reconstruct mids, so this bounds one pass. */
+  DREAMDEX_MARKET_LIMIT: z.coerce.number().int().min(1).max(500).default(10),
 });
 
 export type IndexerConfig = z.infer<typeof configSchema>;

@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 
-import { ReplayAdapter } from '@kalibra/adapter-dreamdex';
+import { LiveAdapter, ReplayAdapter, type DreamDexAdapter } from '@kalibra/adapter-dreamdex';
 import { openDatabase } from '@kalibra/db';
 
 import { loadConfig } from './config.js';
@@ -13,19 +13,23 @@ import { runPipeline } from './pipeline.js';
  */
 async function main(): Promise<void> {
   const config = loadConfig(process.env);
+  let adapter: DreamDexAdapter;
   if (config.KALIBRA_MODE === 'live') {
-    throw new Error(
-      'live mode is not implemented: LiveAdapter lands on day 4, and the venue mapping is ' +
-        'still unverified (docs/DREAMDEX_ADAPTER.md section 7). Use KALIBRA_MODE=replay.',
-    );
+    if (config.DREAMDEX_INDEXER_URL === undefined) {
+      throw new Error('live mode needs DREAMDEX_INDEXER_URL; see docs/DREAMDEX_ADAPTER.md U19');
+    }
+    adapter = new LiveAdapter({
+      indexerUrl: config.DREAMDEX_INDEXER_URL,
+      marketLimit: config.DREAMDEX_MARKET_LIMIT,
+    });
+  } else {
+    adapter = await ReplayAdapter.fromDirectory(join(process.cwd(), 'fixtures', 'synthetic'));
   }
-
-  const adapter = await ReplayAdapter.fromDirectory(join(process.cwd(), 'fixtures', 'synthetic'));
   const { db, close } = openDatabase(config.KALIBRA_DB_PATH);
   try {
     const now = Date.now();
     const summary = await runIngest(adapter, db, { ingestedAt: now });
-    console.log(`replay -> ${config.KALIBRA_DB_PATH}`);
+    console.log(`${config.KALIBRA_MODE} -> ${config.KALIBRA_DB_PATH}`);
     console.log(formatSummary(summary));
 
     const pipeline = runPipeline(db, { computedAt: now });

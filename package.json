@@ -17,7 +17,8 @@
     "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm demo",
     "generate-fixtures": "tsx scripts/generate-fixtures.ts",
     "ingest": "tsx apps/indexer/src/index.ts",
-    "api": "tsx apps/api/src/index.ts"
+    "api": "tsx apps/api/src/index.ts",
+    "record": "tsx scripts/record.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
