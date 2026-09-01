@@ -79,29 +79,31 @@ integration unverified; `STUB` means the interface exists and the implementation
 | Kalibra Score math (`packages/core`) | SYNTHETIC | Every numeric vector in `docs/SCORING_SPEC.md` §8 — V1 through V6 — implemented and green. V1 anchors at exactly 500, V3 scores 528, V4 scores 557, and V5 is strictly monotone across all six edge thresholds. |
 | Aggregation (`packages/core/src/aggregate.ts`) | SYNTHETIC | Stake-weighted price, netting and all five exclusion reasons, asserted against `docs/SCORING_SPEC.md` §4. Output is invariant to the order trades arrive in. |
 | Canonical types and Zod schemas (`packages/adapter-dreamdex`) | SYNTHETIC | Every fixture is parsed by the same schemas a live payload would meet; a checksummed address, an out-of-range probability or a float stake is rejected rather than coerced. The mapping to real venue fields is unverified — `docs/DREAMDEX_ADAPTER.md` §6 has no Verified row. |
-| `ReplayAdapter` | SYNTHETIC | Streams the 12 markets, 681 trades and 12 settlements in `fixtures/synthetic/`. Deliberately **not** labelled REPLAY: that data is generated, not recorded. |
+| `ReplayAdapter` | SYNTHETIC | Streams the 60 markets, 2,386 trades and 60 settlements in `fixtures/synthetic/`. Deliberately **not** labelled REPLAY: that data is generated, not recorded. |
 | `LiveAdapter` | STUB | The `DreamDexAdapter` interface exists; `live.ts` does not. Day 4. No API payload has been captured, and live mode refuses to start rather than pretending. |
 | Persistence (`packages/db`) | SYNTHETIC | Schema extracted verbatim from `docs/API_SPEC.md` §1 into plain SQL and applied to SQLite; a test asserts the Drizzle mirror names exactly the columns the SQL creates. |
-| Ingestion and scoring pipeline (`apps/indexer`) | SYNTHETIC | Ingests every fixture, aggregates 258 positions, scores 194 of them, writes 25 score rows and 250 calibration bins. A second run changes nothing. |
+| Ingestion and scoring pipeline (`apps/indexer`) | SYNTHETIC | Ingests every fixture, aggregates 1,112 positions, scores 861 of them, and writes 25 score rows with 250 calibration bins. A second run changes nothing. |
 | `pnpm demo` | SYNTHETIC | Runs the whole pipeline offline into an in-memory database and asserts the result byte-for-byte against `fixtures/expected/demo-output.json`. |
 
 The public API, the web app, Guard and Arena do not exist yet, so they are not listed —
 there is nothing to claim about them. Rows are added as components land.
 
-### One honest gap in the fixture set
+### What the demo shows
 
-Every wallet in the demo comes out `PROVISIONAL`, and no leaderboard can rank anyone yet.
-That is not a bug in the scoring code; it is a collision between two specifications.
-Aggregation keeps **one position per wallet per market** (`docs/SCORING_SPEC.md` §4.2, the
-rule that stops sample-count farming), the fixture set defines **12 markets**
-(`docs/DREAMDEX_ADAPTER.md` §9), and `MIN_SAMPLE` is **30** (`docs/SCORING_SPEC.md` §1).
-Twelve markets cap a wallet at twelve resolved positions, so thirty is unreachable by
-construction.
+Twenty of the twenty-five wallets clear `MIN_SAMPLE` and are `RANKED`, scoring from 308 to
+678 over 31 to 51 resolved positions each — a spread that runs from measurably worse than
+the market to a real edge over it.
 
-The scores are computed and stored either way, so nothing downstream is blocked. Resolving
-it means widening the fixture set — more windows per underlying, and more trades per
-wallet — which is a change to a specification rather than to code, and is recorded here
-rather than made quietly.
+The five that stay `PROVISIONAL` are exactly the three wash traders and the two
+sub-minimum-stake wallets, and that is the product's central claim made visible: a wash
+nets to zero stake, so it expresses no directional view, so it is excluded and cannot
+manufacture a sample count. **Gaming the metric converges to the metric's null value.**
+
+`docs/DREAMDEX_ADAPTER.md` §9 originally specified 12 markets, which could not work:
+aggregation keeps one position per wallet per market, so twelve markets capped every wallet
+at twelve resolved positions while `MIN_SAMPLE` is 30, and nobody could ever be ranked. The
+fixture set was widened to 60 markets and 40–120 trades per wallet, and the arithmetic
+behind those numbers is recorded in that section.
 
 The DreamDEX integration remains **unverified**. Documentation was located and captured on
 1 Sep 2026 — the raw pages are archived in

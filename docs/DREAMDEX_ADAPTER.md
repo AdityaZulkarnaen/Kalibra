@@ -401,12 +401,21 @@ fixtures/
 **Synthetic generation** uses the same LCG defined in `SCORING_SPEC.md` §8 V4, so fixture
 data and test vectors come from one reproducible source. Generate:
 
-- 12 markets across 3 underlyings, sequential 15-minute windows
+- 60 markets across 3 underlyings, sequential 15-minute windows (20 windows each)
 - 25 wallets with edges spread over `[0.42, 0.68]`, assigned deterministically by index
-- 8 to 40 trades per wallet, stakes log-uniform over `[1, 500]` USDso
+- 40 to 120 trades per wallet, stakes log-uniform over `[1, 500]` USDso
 - 3 wallets that wash trade, to exercise the netting path in `SCORING_SPEC` §4.3
 - 2 wallets below `MIN_STAKE_BASE`, to exercise exclusion
 - 1 market that settles `VOID`
+
+**Why these numbers, revised 1 Sep 2026.** The first version specified 12 markets and 8 to
+40 trades per wallet, and it could not work. Aggregation keeps one position per wallet per
+market (`SCORING_SPEC.md` §4.2), so 12 markets cap a wallet at 12 resolved positions while
+`MIN_SAMPLE` is 30 — every wallet was `PROVISIONAL` by construction and no leaderboard
+could rank anyone. Sixty markets with 40 to 120 trades gives a typical wallet roughly 30 to
+50 distinct positions, so some wallets cross the threshold and some do not, which is what
+the product needs to demonstrate. **Do not shrink these back without re-checking that
+arithmetic.**
 
 `ReplayAdapter` yields events in timestamp order with delays collapsed to zero, so
 `pnpm demo` finishes in seconds.

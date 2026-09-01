@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -10,6 +10,10 @@ import { ReplayAdapter } from './replay.js';
 
 const FIXTURES = join(process.cwd(), 'fixtures', 'synthetic');
 
+/** Counted from the files rather than hardcoded: the fixture size is a spec parameter. */
+const countIn = async (name: string): Promise<number> =>
+  (JSON.parse(await readFile(join(FIXTURES, name), 'utf8')) as unknown[]).length;
+
 const drain = async <T>(stream: AsyncIterable<T>): Promise<T[]> => {
   const rows: T[] = [];
   for await (const row of stream) rows.push(row);
@@ -20,9 +24,11 @@ describe('ReplayAdapter over the committed fixtures', () => {
   it('parses every fixture through the canonical schemas', async () => {
     const adapter = await ReplayAdapter.fromDirectory(FIXTURES);
     const markets = await adapter.listMarkets();
-    expect(markets).toHaveLength(12);
-    expect(await drain(adapter.streamTrades({}))).toHaveLength(681);
-    expect(await drain(adapter.streamSettlements({}))).toHaveLength(12);
+    expect(markets).toHaveLength(await countIn('markets.json'));
+    expect(await drain(adapter.streamTrades({}))).toHaveLength(await countIn('trades.json'));
+    expect(await drain(adapter.streamSettlements({}))).toHaveLength(
+      await countIn('settlements.json'),
+    );
   });
 
   it('yields trades in timestamp order, ties broken by trade id', async () => {

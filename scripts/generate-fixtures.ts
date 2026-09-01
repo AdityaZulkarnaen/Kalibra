@@ -33,12 +33,12 @@ const SEED = 42;
 const EPOCH_MS = Date.UTC(2026, 7, 25, 0, 0, 0);
 const WINDOW_MS = 15 * 60 * 1000;
 const UNDERLYINGS = ['BTC-USD', 'ETH-USD', 'SOL-USD'] as const;
-const WINDOWS = 4;
+const WINDOWS = 20;
 const WALLET_COUNT = 25;
 const EDGE_MIN = 0.42;
 const EDGE_MAX = 0.68;
-const MIN_TRADES = 8;
-const MAX_TRADES = 40;
+const MIN_TRADES = 40;
+const MAX_TRADES = 120;
 const STAKE_MIN_USD = 1;
 const STAKE_MAX_USD = 500;
 

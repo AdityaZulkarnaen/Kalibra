@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import {
@@ -12,6 +13,10 @@ import { runIngest } from './ingest.js';
 
 const FIXTURES = join(process.cwd(), 'fixtures', 'synthetic');
 const INGESTED_AT = 1_787_620_000_000;
+
+/** Counted from the files rather than hardcoded: the fixture size is a spec parameter. */
+const countIn = async (name: string): Promise<number> =>
+  (JSON.parse(await readFile(join(FIXTURES, name), 'utf8')) as unknown[]).length;
 
 let opened: OpenedDatabase;
 
@@ -28,15 +33,21 @@ describe('runIngest over the synthetic fixtures', () => {
     const adapter = await ReplayAdapter.fromDirectory(FIXTURES);
     const summary = await runIngest(adapter, opened.db, { ingestedAt: INGESTED_AT });
 
-    expect(summary.marketsInserted).toBe(12);
-    expect(summary.tradesInserted).toBe(681);
-    expect(summary.settlementsApplied).toBe(12);
+    const [markets, trades, settlements] = await Promise.all([
+      countIn('markets.json'),
+      countIn('trades.json'),
+      countIn('settlements.json'),
+    ]);
+
+    expect(summary.marketsInserted).toBe(markets);
+    expect(summary.tradesInserted).toBe(trades);
+    expect(summary.settlementsApplied).toBe(settlements);
     expect(summary.tradesOrphaned).toBe(0);
     expect(summary.settlementsOrphaned).toBe(0);
 
-    expect(countRows(opened.db, 'markets')).toBe(12);
-    expect(countRows(opened.db, 'trades')).toBe(681);
-    expect(countSettledMarkets(opened.db)).toBe(12);
+    expect(countRows(opened.db, 'markets')).toBe(markets);
+    expect(countRows(opened.db, 'trades')).toBe(trades);
+    expect(countSettledMarkets(opened.db)).toBe(settlements);
   });
 
   it('produces zero duplicate rows when run again', async () => {
@@ -44,11 +55,12 @@ describe('runIngest over the synthetic fixtures', () => {
     await runIngest(adapter, opened.db, { ingestedAt: INGESTED_AT });
     const second = await runIngest(adapter, opened.db, { ingestedAt: INGESTED_AT + 1 });
 
+    const trades = await countIn('trades.json');
     expect(second.marketsInserted).toBe(0);
     expect(second.tradesInserted).toBe(0);
-    expect(second.tradesSeen).toBe(681);
-    expect(countRows(opened.db, 'markets')).toBe(12);
-    expect(countRows(opened.db, 'trades')).toBe(681);
+    expect(second.tradesSeen).toBe(trades);
+    expect(countRows(opened.db, 'markets')).toBe(await countIn('markets.json'));
+    expect(countRows(opened.db, 'trades')).toBe(trades);
   });
 
   it('keeps the first ingestion timestamp rather than overwriting it on replay', async () => {
@@ -92,7 +104,7 @@ describe('runIngest over the synthetic fixtures', () => {
       window: { until: firstWindowEnd },
     });
     expect(summary.tradesSeen).toBeGreaterThan(0);
-    expect(summary.tradesSeen).toBeLessThan(681);
+    expect(summary.tradesSeen).toBeLessThan(await countIn('trades.json'));
   });
 });
 

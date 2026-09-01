@@ -34,17 +34,17 @@ describe('generateFixtures — determinism', () => {
 describe('generateFixtures — the shape DREAMDEX_ADAPTER section 9 asks for', () => {
   const { markets, trades, settlements } = generateFixtures();
 
-  it('has twelve markets over three underlyings in sequential windows', () => {
-    expect(markets).toHaveLength(12);
+  it('has sixty markets over three underlyings in sequential windows', () => {
+    expect(markets).toHaveLength(60);
     expect(new Set(markets.map((market) => market.underlying)).size).toBe(3);
     const starts = [...new Set(markets.map((market) => market.windowStart))].sort((a, b) => a - b);
-    expect(starts).toHaveLength(4);
+    expect(starts).toHaveLength(20);
     for (let i = 1; i < starts.length; i += 1) {
       expect((starts[i] as number) - (starts[i - 1] as number)).toBe(15 * 60 * 1000);
     }
   });
 
-  it('has twenty-five wallets each trading between eight and forty times', () => {
+  it('has twenty-five wallets each trading between forty and a hundred and twenty times', () => {
     const perWallet = new Map<string, number>();
     for (const trade of trades) perWallet.set(trade.wallet, (perWallet.get(trade.wallet) ?? 0) + 1);
     expect(perWallet.size).toBe(25);
@@ -52,8 +52,8 @@ describe('generateFixtures — the shape DREAMDEX_ADAPTER section 9 asks for', (
     const washWallets = new Set([2, 10, 18].map(walletAddress));
     for (const [wallet, count] of perWallet) {
       const iterations = washWallets.has(wallet) ? count / 2 : count;
-      expect(iterations).toBeGreaterThanOrEqual(8);
-      expect(iterations).toBeLessThanOrEqual(40);
+      expect(iterations).toBeGreaterThanOrEqual(40);
+      expect(iterations).toBeLessThanOrEqual(120);
     }
   });
 
@@ -79,6 +79,21 @@ describe('generateFixtures — the shape DREAMDEX_ADAPTER section 9 asks for', (
     const excluded = new Set([7, 15].map(walletAddress));
     const scoreable = trades.filter((trade) => !excluded.has(trade.wallet));
     expect(scoreable.every((trade) => trade.stake >= MIN_STAKE_BASE)).toBe(true);
+  });
+
+  it('gives a typical wallet enough distinct markets to reach MIN_SAMPLE', () => {
+    // The reason section 9 was widened: one position per wallet per market means the
+    // market count is a hard ceiling on n, and MIN_SAMPLE is 30.
+    const excluded = new Set([2, 10, 18, 7, 15].map(walletAddress));
+    const distinct = new Map<string, Set<string>>();
+    for (const trade of trades) {
+      if (excluded.has(trade.wallet)) continue;
+      if (!distinct.has(trade.wallet)) distinct.set(trade.wallet, new Set());
+      distinct.get(trade.wallet)?.add(trade.marketId);
+    }
+    for (const [wallet, marketIds] of distinct) {
+      expect(marketIds.size, `${wallet} must be able to be RANKED`).toBeGreaterThanOrEqual(30);
+    }
   });
 
   it('settles exactly one market VOID and the rest to a side', () => {

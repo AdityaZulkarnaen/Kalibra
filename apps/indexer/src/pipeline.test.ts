@@ -110,9 +110,16 @@ describe('the full pipeline over the synthetic fixtures', () => {
     }
   });
 
-  it('withholds a published score from every PROVISIONAL wallet', async () => {
+  it('ranks the wallets that cleared MIN_SAMPLE and withholds the rest', async () => {
     await ingestAndScore();
-    for (const row of listScores(opened.db)) {
+    const rows = listScores(opened.db);
+    // The fixture set is sized so both branches are exercised: only the three wash and two
+    // sub-minimum wallets should fail to reach MIN_SAMPLE.
+    expect(rows.filter((row) => row.status === 'RANKED').length).toBeGreaterThan(0);
+    expect(rows.filter((row) => row.status === 'PROVISIONAL').map((row) => row.wallet)).toEqual(
+      [...WASH_WALLETS, ...DUST_WALLETS].sort(),
+    );
+    for (const row of rows) {
       if (row.n < MIN_SAMPLE) {
         expect(row.status).toBe('PROVISIONAL');
         expect(row.score).toBeNull();
