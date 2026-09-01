@@ -225,32 +225,33 @@ network access, which keeps invariant I3 intact.
 
 **Fill this in during Step 4. Do not delete rows. `?` means unknown and blocks live mode.**
 
-**Provenance.** Rows prefixed `doc:` come from the documentation archived verbatim in
-`fixtures/recorded/docs-snapshot-2026-09-01/`, read 1 Sep 2026. They are *documentation,
-not capture*: Step 3 requires a recorded payload before any row is marked Verified, and
-**no row below is Verified**. Nothing in this table has been written into code — the
-adapter is still unimplemented. Names in the `source` column are the SDK's, and the SDK is
-the only documented event-contract surface (U13).
+**Provenance.** Rows marked ☑ are backed by payloads captured from the Shannon testnet
+indexer on 1 Sep 2026 and committed under
+`fixtures/recorded/dreamdex-testnet-2026-09-01/`. Rows still marked ☐ are documentation
+only. The source column names GraphQL fields on the indexer at
+`https://dev.smk.somnia.host/v1/graphql`; the read surface needs no key.
 
 | Canonical field | DreamDEX source | Transform | Verified |
 |---|---|---|---|
-| `CanonicalMarket.marketId` | doc: `bytes32 marketId` from the module registry. Never the pool address — pools are recycled across windows | → lowercase hex string | ☐ |
-| `CanonicalMarket.underlying` | doc: the market's asset, also the symbol prefix, e.g. `BTC` in `BTC-0-12AUG26-1600/USDso#YES` | uppercase | ☐ |
-| `CanonicalMarket.windowStart` | doc: the market row's trading start | → ms UTC | ☐ |
-| `CanonicalMarket.windowEnd` | doc: the market row's expiry | → ms UTC | ☐ |
-| `CanonicalMarket.strike` | doc: **null.** There is no listed strike — the line is the window's own opening price (`getOpeningPrices`, `getMarketResolution().openingAnswer`) | always null; carry the opening price separately if needed | ☐ |
-| `CanonicalMarket.status` | doc: Listed 0, Trading 1, Locked 2, Settling 3, Resolved 4, Voided 5 | 0/1 → OPEN, 2/3 → CLOSED, 4 → SETTLED, 5 → VOID | ☐ |
-| `CanonicalTrade.tradeId` | doc: fills carry `blockNumber` and `logIndex` | compose `${blockNumber}:${logIndex}` — stable, and the natural idempotency key | ☐ |
-| `CanonicalTrade.wallet` | doc: fill rows are wallet-attributed — `getUserFills(account)` filters the same tape to one account. Subject to U20 | lowercase, never checksummed | ☐ |
-| `CanonicalTrade.side` | doc: one book quoted in Up terms; outcome symbol suffix `#YES` / `#NO`; a Down price is 1 − the Up price | → UP/DOWN | ☐ |
-| `CanonicalTrade.impliedProbUp` | doc: prices are Up probabilities in (0, 1). **But a fill price is not a mid** — see U18 | clamp per `SCORING_SPEC.md` §2; set `quoteSource` honestly | ☐ |
-| `CanonicalTrade.stake` | doc: collateral risked, quantity × price, in base units of the pool's collateral token | → bigint, no scaling | ☐ |
-| `CanonicalTrade.stakeDecimals` | doc: 6 on testnet (tUSDC), 18 on mainnet (USDso) — read `decimals()`, never a literal (U7) | carry, do not normalise | ☐ |
-| `CanonicalTrade.timestamp` | doc: fill row block time; `getFills(pool, { since, until })` bounds in ms | → ms UTC | ☐ |
-| `CanonicalSettlement.outcome` | doc: state 4 → compare `closingAnswer.numericValue` with `openingAnswer.numericValue`, **at or above → UP**, below → DOWN. State 5 → VOID | compare, inclusive on the Up side | ☐ |
-| `CanonicalSettlement.settledAt` | doc: lifecycle `events` on `getMarketResolution(marketId)` | → ms UTC | ☐ |
-| `CanonicalQuote.midUp` | doc: **not served.** No order-book snapshot table; derivable from order rows via `placedAtBlock` / `lastUpdatedAtBlock`, or approximable from candles | see U18 before implementing | ☐ |
-| `CanonicalOrder` → venue request | doc: `createOrder(symbol, 'limit', side, qty, price, { timeInForce })`, or the raw trader tier for exact bigint units | quantise to tick and lot first | ☐ |
+| `CanonicalMarket.marketId` | `Market.marketId`, a `bytes32` counter | lowercase hex, as given | ☑ |
+| `CanonicalMarket.underlying` | `Market.asset`, e.g. `"BTC"` | uppercase | ☑ |
+| `CanonicalMarket.windowStart` | `Market.tradingStart`, seconds | × 1000 | ☑ |
+| `CanonicalMarket.windowEnd` | `Market.expiry`, seconds | × 1000 | ☑ |
+| `CanonicalMarket.strike` | `Market.strike` | `"0"` → null (the line is the window's opening price); otherwise → bigint. See U22 | ☑ |
+| `CanonicalMarket.strikeDecimals` | `?` — the scale of a non-zero strike is unconfirmed | see U22 | ☐ |
+| `CanonicalMarket.status` | `Market.clobStatus`, plus `finalized` and `voided` | `Finalized` + `voided` → VOID, `Finalized` → SETTLED, else OPEN/CLOSED | ☑ |
+| `CanonicalTrade.tradeId` | `Fill.id`, already `${blockNumber}_${logIndex}` | as given — a natural idempotency key | ☑ |
+| `CanonicalTrade.wallet` | `Fill.taker`, and `Fill.maker` for the other leg | lowercase | ☑ |
+| `CanonicalTrade.side` | `Fill.takerSide` / `makerSide`: `BUY_YES`, `SELL_YES`, `BUY_NO`, `SELL_NO` | BUY_YES and SELL_NO → UP; SELL_YES and BUY_NO → DOWN | ☑ |
+| `CanonicalTrade.impliedProbUp` | **not** `Fill.fillPrice` — the reconstructed mid at block − 1. See 7.2 | already in [0,1] at `quoteDecimals`; clamp per `SCORING_SPEC.md` §2 | ☑ |
+| `CanonicalTrade.stake` | `Fill.quoteQuantity`, the collateral that changed hands | as given, bigint base units | ☑ |
+| `CanonicalTrade.stakeDecimals` | `Market.quoteDecimals` — **6** on testnet | carry, never normalise | ☑ |
+| `CanonicalTrade.timestamp` | `Fill.timestamp`, seconds | × 1000 | ☑ |
+| `CanonicalTrade.txHash` | `Fill.txHash` | lowercase | ☑ |
+| `CanonicalSettlement.outcome` | `Market.voided`, `Market.winningOutcome` (0 = YES) | voided → VOID, 0 → UP, 1 → DOWN | ☑ |
+| `CanonicalSettlement.settledAt` | `Market.resolvedAtTimestamp`, seconds | × 1000 | ☑ |
+| `CanonicalQuote.midUp` | derived from `Order` rows: `price`, `side`, `rested`, `quantityRemaining`, `placedAtBlock`, `lastUpdatedAtBlock` | reconstruct at block − 1; see 7.2 | ☑ |
+| `CanonicalOrder` → venue request | `exchange.createOrder(symbol, 'limit', side, qty, price)` | quantise to tick and lot first | ☐ |
 
 ## 7. Unknowns checklist
 
@@ -266,28 +267,38 @@ code without a fallback.
 |---|---|---|---|
 | U1 | REST base URL and WS URL for testnet | Live mode cannot connect | DOC, but **not the path we need** — the spot HTTP API is `https://stg.api.dreamdex.io/v0` on testnet with WS `wss://stg.api.dreamdex.io/v0/ws/public`, and per U13 it serves no event contracts. The event-contract surface is the SDK. See U19 |
 | U2 | Auth scheme for public market data | Live mode cannot connect | DOC — SIWE (ERC-4361) is documented for the spot HTTP API. Event-contract market data is chain and indexer reads; no authentication is documented for reading, and a private key is documented only for writes |
-| U3 | UP/DOWN as separate instruments or one with a side flag | Side normalisation inverted; **every score wrong and the error is invisible** | DOC — one book quoted in Up terms; a Down price is always 1 − the Up price. Outcome symbols carry `#YES` / `#NO`. 7.1(b) |
-| U4 | Price quote units | `impliedProbUp` out of range or silently scaled wrong | DOC — prices are Up probabilities in (0, 1), already the quantity `SCORING_SPEC.md` §2 calls `p`. 7.1(b) |
-| U5 | Historical trade endpoint and depth | No backfill; scores only from indexer start | DOC — answered well. Fills, orders and candles all survive settlement; a five-week-old finalized market still returns its full trade tape. `listPastBinaryMarkets` pages with limit and offset, `countBinaryMarkets` gives the tail length. 7.1(e) |
+| U3 | UP/DOWN as separate instruments or one with a side flag | Side normalisation inverted; **every score wrong and the error is invisible** | **VERIFIED** — one book, four side values: `BUY_YES`, `SELL_YES`, `BUY_NO`, `SELL_NO` |
+| U4 | Price quote units | `impliedProbUp` out of range or silently scaled wrong | **VERIFIED** — `fillPrice: "614000"` at `quoteDecimals: 6` is 0.614 |
+| U5 | Historical trade endpoint and depth | No backfill; scores only from indexer start | **VERIFIED** — a settled market returns its full fill tape and every order that ever rested on it |
 | U6 | Settlement publication mechanism | Outcomes never arrive; nothing ever scores | DOC — an oracle posts the answer at expiry and on-chain reactivity delivers it to the module callback; no keeper. Backstops: `pokeOracle(questionId)` and permissionless `voidExpired()`. 7.1(c) |
-| U7 | Settlement token and its decimals | `MIN_STAKE_BASE` threshold wrong by orders of magnitude | DOC — **answered, and it bites.** Testnet collateral is tUSDC at **6** decimals; mainnet collateral is USDso at **18**. A factor of 10^12, and the documentation warns that nothing reverts to tell you. 7.1(f) |
-| U8 | Is mid-of-book available at trade time, or only last price | Falls back to `LAST`, degrading forecast accuracy | DOC — there is no order-book snapshot table. The book at any block is *derivable* from order rows via `placedAtBlock` / `lastUpdatedAtBlock`, but nothing serves a mid directly. Promoted to a design decision as U18 |
-| U9 | Multiple strikes per window, or a single window-open reference | Affects market identity and grouping | DOC — **single reference, no strike.** The line is the window's own opening price: at or above it Up wins, below it Down wins. So `CanonicalMarket.strike` is null and the boundary is inclusive on the Up side. 7.1(d) |
-| U10 | Are trades attributed to a wallet address in the public feed | **If not, Kalibra cannot function as designed.** See §8 | DOC — **yes.** The SDK indexer exposes `getFills(pool, opts)` as a pool-wide tape and `getUserFills(account, opts)` as the same tape filtered to one wallet, so fill rows carry an account. Residual risk is U20 |
-| U11 | Rate limits on REST and WS | Ingestion gets throttled or banned mid-demo | DOC — documentation states there are no API rate limits: market data is the chain itself and the public RPC endpoints are unthrottled |
+| U7 | Settlement token and its decimals | `MIN_STAKE_BASE` threshold wrong by orders of magnitude | **VERIFIED on testnet** — `Market.quoteDecimals: 6`, which is what `MIN_STAKE_BASE` assumes. Mainnet is 18 and out of scope |
+| U8 | Is mid-of-book available at trade time, or only last price | Falls back to `LAST`, degrading forecast accuracy | **VERIFIED** — no mid is served, and the book is reconstructable. Resolved by U18 and 7.2 |
+| U9 | Multiple strikes per window, or a single window-open reference | Affects market identity and grouping | **VERIFIED, and more complicated than documented** — see U22 |
+| U10 | Are trades attributed to a wallet address in the public feed | **If not, Kalibra cannot function as designed.** See section 8 | **VERIFIED** — every `Fill` row carries `maker` and `taker`. Plan A stands |
+| U11 | Rate limits on REST and WS | Ingestion gets throttled or banned mid-demo | DOC — documented as none. Not stress-tested, and not worth stress-testing |
 | U12 | Whether VOID or cancellation is possible | Void positions scored as real losses | DOC — yes. Voided (5); both sides redeem at 0.5; `voidExpired()` is permissionless once the settlement window has passed. 7.1(c) |
 | U13 | Does any HTTP endpoint serve event contracts | Decides whether ingestion is REST, SDK, or chain logs — the shape of `LiveAdapter` | DOC — no. The documentation states the HTTP API covers spot only and has no event-contract endpoints; the developer surface is the `@somnia-chain/markets-sdk` TypeScript package, version 0.28.0 or newer |
 | U14 | Does the event-contract book emit the same `OrderFilled` events as the spot order book | Decides which logs a raw-chain ingestion path would subscribe to | DOC-partial — the per-market pool is documented as extending the same on-chain matching engine as spot, which makes the same events likely, but it is not stated outright. Now low priority: U10 means the indexer serves attributed fills directly, so raw log decoding is a fallback rather than the plan |
-| U15 | `OrderFilled` carries taker and maker order ids, not addresses | A raw-chain path needs a join from fill back to placement to recover the owner | DOC — confirmed against the events page, and **no longer on the critical path** for the same reason as U14 |
+| U15 | `OrderFilled` carries taker and maker order ids, not addresses | A raw-chain path needs a join from fill back to placement | **CLOSED** — moot. The indexer attributes fills directly, so no join is needed |
 | U16 | `loadMarkets()` omits settled markets | Settled markets — the only scoreable ones — would be invisible to the indexer | DOC — use `listPastBinaryMarkets({ status: "Finalized" })`. Note `Resolved` returns an empty list, because resolution auto-finalizes |
-| U17 | Somnia testnet chain id and RPC URL | Cannot point viem at the right chain | DOC-partial — testnet is Somnia Shannon, chain id **50312** (mainnet 5031), explorer `shannon-explorer.somnia.network`. Protocol addresses are identical on both networks via CREATE3. The testnet RPC URL itself was not on any page read |
+| U17 | Somnia testnet chain id and RPC URL | Cannot point viem at the right chain | **VERIFIED** — Shannon, chain id 50312, RPC `wss://api.infra.testnet.somnia.network/ws` |
 | U18 | `SCORING_SPEC.md` §2 wants the **mid at execution**, but the venue serves a fill tape and derivable order rows, not a mid time series | Using the fill price instead conflates forecasting skill with execution quality — the exact error §2 exists to prevent | **DECIDED 1 Sep 2026: reconstruct the book.** See 7.2 |
-| U19 | The `indexerUrl` the SDK client is constructed with | Without it `LiveAdapter` cannot be constructed at all | OPEN — the documentation site shows `new SomniaMarkets({ indexerUrl, chain, wsRpcUrl, addresses, privateKey })` but never gives the value; it points to the package README on npm |
-| U20 | Is `getUserFills(account)` permissionless for an arbitrary wallet, or only for one's own | If privileged, U10 collapses back to Plan B or C and the leaderboard covers registered wallets only | OPEN — **the one that still matters.** The spot CLI marks its equivalent (`mytrades --trader <addr>`) as privileged; the event-contract SDK documentation marks `getUserFills` as neither. Do not assume |
+| U19 | The `indexerUrl` the SDK client is constructed with | Without it `LiveAdapter` cannot be constructed at all | **VERIFIED** — testnet `https://dev.smk.somnia.host/v1/graphql`; a GraphQL indexer, queried directly in the capture |
+| U20 | Is reading another wallet's fills permissionless | If privileged, U10 collapses back to Plan B or C | **VERIFIED — permissionless.** The capture was taken anonymously: no key, no wallet, no signature |
 | U21 | How a mint-a-pair fill appears in the tape | Buy Up × Buy Down crosses with no seller and the pool mints a fresh pair. If it is one row, side attribution for one of the two counterparties is ambiguous | OPEN — affects `CanonicalTrade` construction and therefore §4.1 aggregation |
 
-**U3 and U10 were the existential pair.** Both are now answered by documentation. U10's
-residual risk is U20, which is the single question most worth asking a human at the venue.
+| U22 | `Market.strike` is `"0"` on the captured market, whose question reads "closes at or above its opening price", but sibling markets carry concrete strikes such as `245100` | A strike read as an opening-price reference, or the reverse, mislabels what the contract actually claims | OPEN — both shapes exist on testnet. The scale of a non-zero strike is also unconfirmed. Only the `"0"` shape has been captured end to end |
+| U23 | The book is four-sided, and a `BUY_YES` can cross a `BUY_NO` by minting a pair rather than matching a seller | Folding NO orders into the UP frame is the one inversion in the codebase; getting it backwards inverts every reconstructed mid | **VERIFIED for the fold** — the reconstruction is uncrossed at all three captured fills. Mint-a-pair crossing is documented but not yet observed in a capture |
+| U24 | A fully-filled order keeps its price in the order rows | Counted as liquidity it silently crosses the book and corrupts the mid | **VERIFIED** — filter on `rested` and `quantityRemaining > 0`. This mistake was made and caught during the capture |
+
+**U3 and U10 were the existential pair. Both are now VERIFIED by capture**, and so is U20,
+the question they rested on. Reading another wallet's fills needs no key: the payloads in
+`fixtures/recorded/dreamdex-testnet-2026-09-01/` were taken anonymously. Plan A stands
+without a fallback being needed.
+
+What remains open is narrower and none of it is existential: U22 (what a non-zero strike
+means and at what scale), U23 (mint-a-pair crossing, documented but not yet observed), and
+the write path, which is untested because it needs a funded wallet.
 
 ### 7.1 Discovery log
 

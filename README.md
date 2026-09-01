@@ -106,40 +106,17 @@ at twelve resolved positions while `MIN_SAMPLE` is 30, and nobody could ever be 
 fixture set was widened to 60 markets and 40–120 trades per wallet, and the arithmetic
 behind those numbers is recorded in that section.
 
-The DreamDEX integration remains **unverified**. Documentation was located and captured on
-1 Sep 2026 — the raw pages are archived in
-[`fixtures/recorded/docs-snapshot-2026-09-01/`](fixtures/recorded/) — and most of the open
-questions now have documented answers, including the two flagged as existential. **None is
-answered by a captured API payload**, so no live claim is made anywhere in this repository
-and no adapter code has been written against it. Checklist and discovery log:
-[`docs/DREAMDEX_ADAPTER.md`](docs/DREAMDEX_ADAPTER.md) §7.
+The DreamDEX integration is **partly verified**. Real payloads were captured anonymously
+from the Shannon testnet indexer on 1 Sep 2026 and are committed under
+[`fixtures/recorded/dreamdex-testnet-2026-09-01/`](fixtures/recorded/), with a README
+explaining what each byte establishes. Eleven questions in
+[`docs/DREAMDEX_ADAPTER.md`](docs/DREAMDEX_ADAPTER.md) §7 moved from documentation to
+capture, including both that were marked existential: fills carry `maker` and `taker`
+addresses, and reading another wallet's fills needs no key.
 
-The attribution plan required by day 2 is not recorded here yet. Documentation says the
-fill tape is wallet-attributed, which points at Plan A; what remains is whether that read
-is permissionless for an arbitrary wallet (U20). That is the one question still worth
-asking a human.
-
----
-
-## Decisions in effect
-
-**Attribution: Plan A** (`docs/DREAMDEX_ADAPTER.md` §8). Kalibra reads fills from the
-venue's own indexer, which serves a wallet-attributed fill tape — a pool-wide tape and the
-same tape filtered to one account. That is cheaper and more direct than decoding raw chain
-logs, which carry order ids rather than addresses and would need a join back to the
-placement to recover an owner.
-
-The open risk is whether reading another wallet's fills is permissionless (`U20`). If it
-turns out to be privileged, Plan A degrades to Plan B (opt-in registration) and Plan C
-(Arena-only, where Guard placed the order and attribution is guaranteed) remains the
-floor. The project cannot fail to ship, only ship smaller.
-
-**Network: Somnia Shannon testnet only**, chain id 50312. `MIN_STAKE_BASE` stays a literal
-at six decimals, which is correct for the testnet collateral token. Mainnet collateral
-carries eighteen decimals, so the same literal would be wrong by a factor of 10^12 there —
-and nothing would revert to say so. Kalibra does not target mainnet, and this is recorded
-as a limitation rather than engineered around. It joins the known-limitations list copied
-verbatim from `docs/PRD.md` §9 into this README on day 8.
+No code talks to the venue yet — `LiveAdapter` is still unwritten, so nothing in the
+real-vs-mocked table above claims LIVE. What the capture bought is a mapping table with
+verified rows instead of guesses.
 
 ---
 
