@@ -63,6 +63,7 @@ To browse the index instead of reading a summary of it, run the three pieces in 
 pnpm ingest        # fixtures -> ./kalibra.db  (KALIBRA_MODE=live reads the testnet instead)
 pnpm api           # read-only HTTP on :3001
 pnpm web           # Next.js on :3000, reading that API and nothing else
+pnpm guard         # policy engine on :3002, between an agent and the venue
 ```
 
 `pnpm demo` is the canonical entry point for reviewers. It must succeed on a clean
@@ -79,7 +80,7 @@ Somnia interaction with a transaction hash or a captured response in `fixtures/`
 `REPLAY` means recorded real data; `SYNTHETIC` means generated data with the real
 integration unverified; `STUB` means the interface exists and the implementation does not.
 
-**As of day 5 of nine, complete (`docs/BUILD_PLAN.md`).** One row below is `LIVE`; the rest
+**As of day 6 of nine, complete (`docs/BUILD_PLAN.md`).** One row below is `LIVE`; the rest
 run on generated data.
 
 | Component | Status | Evidence |
@@ -93,10 +94,13 @@ run on generated data.
 | Ingestion and scoring pipeline (`apps/indexer`) | SYNTHETIC | Ingests every fixture, aggregates 1,112 positions, scores 861 of them, and writes 25 score rows with 250 calibration bins. A second run changes nothing. |
 | Public read API (`apps/api`) | SYNTHETIC | Every endpoint in `docs/API_SPEC.md` §2, with responses parsed by their published Zod schema before they are sent in test mode. The example payloads in that document are parsed by the same schemas, so the spec and the server cannot drift apart without a test failing. |
 | Web app (`apps/web`) | SYNTHETIC | Leaderboard and `/w/:address` profile, rendered per request from `apps/api` with no hardcoded, cached or fallback data — verified by killing the API and confirming the page shows an error rather than numbers. The data it displays is the synthetic fixture set. |
+| Guard policy engine (`packages/core/src/policy.ts`) | SYNTHETIC | All eleven reason codes from `docs/RISK_POLICY_SPEC.md` §4, one test each asserting that code and no other, plus the rule ordering: a killed agent over its daily loss sees `KILL_SWITCH_ACTIVE`. Pure — the clock is an argument. |
+| Guard audit chain (`packages/core/src/audit.ts`) | SYNTHETIC | Keccak-256 over canonical JSON. Verified in both directions: a clean log passes, and insertion, deletion, reordering and a single rewritten field each fail at the right index. Demonstrated against a live SQLite log, below. |
+| Guard transport (`apps/guard`) | SYNTHETIC | HTTP surface, orders forwarded through the adapter, fills written to `trades` with `source = 'GUARD'`. Runs against `ReplayAdapter`; no order has been sent to a real venue, which needs a funded signer on day 7. |
 | `pnpm demo` | SYNTHETIC | Runs the whole pipeline offline into an in-memory database and asserts the result byte-for-byte against `fixtures/expected/demo-output.json`. |
 
-Guard and Arena do not exist yet, so they are not listed — there is nothing to claim about
-them. Rows are added as components land.
+Arena does not exist yet, so it is not listed — there is nothing to claim about it. Rows
+are added as components land.
 
 ### What "LIVE" means here, and what it does not
 
@@ -125,6 +129,31 @@ The five that stay `PROVISIONAL` are exactly the three wash traders and the two
 sub-minimum-stake wallets, and that is the product's central claim made visible: a wash
 nets to zero stake, so it expresses no directional view, so it is excluded and cannot
 manufacture a sample count. **Gaming the metric converges to the metric's null value.**
+
+### The audit chain, checked rather than claimed
+
+Guard writes its decision to a hash-chained log **before** forwarding the order. A crash
+between the two leaves an entry with no order, which is detectable; the reverse would leave
+an order with no record, which is not, and is therefore not permitted to be possible.
+
+The chain was tampered with on purpose against a running server. Two orders were refused
+and logged, `GET /guard/verify` returned `{"valid": true}`, and then a `DENY` was rewritten
+to an `ALLOW` directly in SQLite &mdash; the forgery an operator would actually attempt:
+
+```
+{"brokenAt":0,
+ "expected":"0xf7ef582a8b39a9b366734db6675f8730d82a756498f2c4a5267171087cf7d129",
+ "found":"0x4b5eed20804184061b6d1d032f030af1649690effd8b4b555b50c5abcce49561",
+ "valid":false}
+```
+
+Both orders in that run were refused `MARKET_NOT_ALLOWED`, because `allowedMarkets` in
+[`guard.policy.json`](guard.policy.json) is empty and stays empty until an operator adds a
+market. Deny by default is the shipped default, not a test fixture.
+
+The operator's kill switch answers 401 without a token, and the routes are not registered
+at all when no token is configured &mdash; an agent that finds the port cannot widen its own
+limits. There is no `set_policy` anywhere in the codebase.
 
 ### The calibration curve
 
