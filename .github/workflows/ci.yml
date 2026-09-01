@@ -1,0 +1,26 @@
+# CLAUDE.md section 2 says the invariants are checked in CI. This is where that is true.
+# The job runs the same `pnpm verify` a developer runs, so local green and CI green mean
+# the same thing.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # typecheck, lint, format, tests, and the offline demo.
+      - run: pnpm verify
