@@ -3,6 +3,6 @@
   "compilerOptions": {
     "types": ["node"]
   },
-  "include": ["packages/*/src/**/*.ts", "scripts/**/*.ts", "*.ts"],
-  "exclude": ["node_modules", "dist", "**/__fixtures__/**"]
+  "include": ["packages/*/src/**/*.ts", "apps/*/src/**/*.ts", "scripts/**/*.ts", "*.ts"],
+  "exclude": ["node_modules", "dist", "**/__fixtures__/**", "apps/web"]
 }

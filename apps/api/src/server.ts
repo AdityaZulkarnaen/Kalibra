@@ -43,7 +43,7 @@ export function buildServer(db: KalibraDatabase, options: ServerOptions = {}): F
   const validate = options.validateResponses ?? false;
   const app = Fastify({ logger: false });
 
-  const send = <T>(reply: unknown, schema: z.ZodType<T>, body: T): T => {
+  const send = <T>(schema: z.ZodType<T>, body: T): T => {
     if (!validate) return body;
     const result = schema.safeParse(body);
     if (!result.success) {
@@ -61,9 +61,10 @@ export function buildServer(db: KalibraDatabase, options: ServerOptions = {}): F
     reply.code(404).send(fail('NOT_FOUND', 'no such route')),
   );
 
-  app.setErrorHandler((error, _request, reply) => {
+  app.setErrorHandler((error: unknown, _request, reply) => {
     if (validate) throw error;
-    return reply.code(500).send(fail('INTERNAL', error.message));
+    const message = error instanceof Error ? error.message : String(error);
+    return reply.code(500).send(fail('INTERNAL', message));
   });
 
   app.get('/v1/leaderboard', (request, reply) => {
@@ -81,7 +82,7 @@ export function buildServer(db: KalibraDatabase, options: ServerOptions = {}): F
 
     const { total, rows } = readLeaderboard(db, page.data, statusFilter.data === 'ranked');
     return reply.send(
-      send(reply, leaderboardSchema, {
+      send(leaderboardSchema, {
         params: {
           lambdaMax: LAMBDA_MAX,
           shrinkK: SHRINK_K,
@@ -122,7 +123,7 @@ export function buildServer(db: KalibraDatabase, options: ServerOptions = {}): F
 
     const bins = readCalibration(db, address);
     return reply.send(
-      send(reply, walletSchema, {
+      send(walletSchema, {
         wallet: score.wallet,
         score: score.score,
         status: score.status as 'RANKED' | 'PROVISIONAL',
@@ -170,7 +171,7 @@ export function buildServer(db: KalibraDatabase, options: ServerOptions = {}): F
 
     const { total, rows } = readWalletPositions(db, address, page.data);
     return reply.send(
-      send(reply, walletPositionsSchema, {
+      send(walletPositionsSchema, {
         total,
         positions: rows.map((row) => ({
           positionId: row.positionId,
@@ -209,7 +210,7 @@ export function buildServer(db: KalibraDatabase, options: ServerOptions = {}): F
     // field is still a contract deviation. The count is read but not published.
     const { rows } = readMarkets(db, page.data, filters);
     return reply.send(
-      send(reply, marketsSchema, {
+      send(marketsSchema, {
         markets: rows.map((row) => ({
           marketId: row.marketId,
           underlying: row.underlying,
