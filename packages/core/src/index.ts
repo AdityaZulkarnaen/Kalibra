@@ -9,5 +9,6 @@ export * from './errors.js';
 export * from './forecast.js';
 export * from './lcg.js';
 export * from './params.js';
+export * from './policy.js';
 export * from './score.js';
 export * from './types.js';
