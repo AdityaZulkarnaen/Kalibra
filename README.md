@@ -72,20 +72,36 @@ Somnia interaction with a transaction hash or a captured response in `fixtures/`
 `REPLAY` means recorded real data; `SYNTHETIC` means generated data with the real
 integration unverified; `STUB` means the interface exists and the implementation does not.
 
-**As of day 2 of nine (`docs/BUILD_PLAN.md`).** Nothing below has touched real market data.
+**As of day 3 of nine (`docs/BUILD_PLAN.md`).** Nothing below has touched real market data.
 
 | Component | Status | Evidence |
 |---|---|---|
-| Kalibra Score math (`packages/core`) | SYNTHETIC | Every numeric vector in `docs/SCORING_SPEC.md` §8 — V1, V2, V3, V4, V5, V6 — implemented and green. V1 anchors at exactly 500, V3 scores 528, V4 scores 557, and V5 is strictly monotone across all six edge thresholds. |
+| Kalibra Score math (`packages/core`) | SYNTHETIC | Every numeric vector in `docs/SCORING_SPEC.md` §8 — V1 through V6 — implemented and green. V1 anchors at exactly 500, V3 scores 528, V4 scores 557, and V5 is strictly monotone across all six edge thresholds. |
+| Aggregation (`packages/core/src/aggregate.ts`) | SYNTHETIC | Stake-weighted price, netting and all five exclusion reasons, asserted against `docs/SCORING_SPEC.md` §4. Output is invariant to the order trades arrive in. |
 | Canonical types and Zod schemas (`packages/adapter-dreamdex`) | SYNTHETIC | Every fixture is parsed by the same schemas a live payload would meet; a checksummed address, an out-of-range probability or a float stake is rejected rather than coerced. The mapping to real venue fields is unverified — `docs/DREAMDEX_ADAPTER.md` §6 has no Verified row. |
 | `ReplayAdapter` | SYNTHETIC | Streams the 12 markets, 681 trades and 12 settlements in `fixtures/synthetic/`. Deliberately **not** labelled REPLAY: that data is generated, not recorded. |
 | `LiveAdapter` | STUB | The `DreamDexAdapter` interface exists; `live.ts` does not. Day 4. No API payload has been captured, and live mode refuses to start rather than pretending. |
-| Persistence (`packages/db`) | SYNTHETIC | Schema extracted verbatim from `docs/API_SPEC.md` §1 into plain SQL and applied to SQLite; a test asserts the Drizzle mirror names exactly the columns the SQL creates. Only synthetic rows have passed through it. |
-| Ingestion (`apps/indexer`) | SYNTHETIC | Ingests every fixture, and a second run inserts zero rows. Replay only. |
+| Persistence (`packages/db`) | SYNTHETIC | Schema extracted verbatim from `docs/API_SPEC.md` §1 into plain SQL and applied to SQLite; a test asserts the Drizzle mirror names exactly the columns the SQL creates. |
+| Ingestion and scoring pipeline (`apps/indexer`) | SYNTHETIC | Ingests every fixture, aggregates 258 positions, scores 194 of them, writes 25 score rows and 250 calibration bins. A second run changes nothing. |
+| `pnpm demo` | SYNTHETIC | Runs the whole pipeline offline into an in-memory database and asserts the result byte-for-byte against `fixtures/expected/demo-output.json`. |
 
-The scoring pipeline, the public API, the web app, Guard and Arena do not exist yet, so
-they are not listed — there is nothing to claim about them. Rows are added as components
-land.
+The public API, the web app, Guard and Arena do not exist yet, so they are not listed —
+there is nothing to claim about them. Rows are added as components land.
+
+### One honest gap in the fixture set
+
+Every wallet in the demo comes out `PROVISIONAL`, and no leaderboard can rank anyone yet.
+That is not a bug in the scoring code; it is a collision between two specifications.
+Aggregation keeps **one position per wallet per market** (`docs/SCORING_SPEC.md` §4.2, the
+rule that stops sample-count farming), the fixture set defines **12 markets**
+(`docs/DREAMDEX_ADAPTER.md` §9), and `MIN_SAMPLE` is **30** (`docs/SCORING_SPEC.md` §1).
+Twelve markets cap a wallet at twelve resolved positions, so thirty is unreachable by
+construction.
+
+The scores are computed and stored either way, so nothing downstream is blocked. Resolving
+it means widening the fixture set — more windows per underlying, and more trades per
+wallet — which is a change to a specification rather than to code, and is recorded here
+rather than made quietly.
 
 The DreamDEX integration remains **unverified**. Documentation was located and captured on
 1 Sep 2026 — the raw pages are archived in
