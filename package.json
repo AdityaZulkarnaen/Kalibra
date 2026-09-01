@@ -20,7 +20,8 @@
     "api": "tsx apps/api/src/index.ts",
     "record": "tsx scripts/record.ts",
     "web": "pnpm --filter @kalibra/web dev",
-    "web:build": "pnpm --filter @kalibra/web build"
+    "web:build": "pnpm --filter @kalibra/web build",
+    "guard": "tsx apps/guard/src/index.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -43,7 +44,9 @@
     "@kalibra/api": "workspace:*",
     "@kalibra/core": "workspace:*",
     "@kalibra/db": "workspace:*",
+    "@kalibra/guard": "workspace:*",
     "@kalibra/indexer": "workspace:*",
+    "@noble/hashes": "^2.4.0",
     "better-sqlite3": "^13.0.3",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.12.1",

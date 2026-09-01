@@ -20,9 +20,15 @@ importers:
       '@kalibra/db':
         specifier: workspace:*
         version: link:packages/db
+      '@kalibra/guard':
+        specifier: workspace:*
+        version: link:apps/guard
       '@kalibra/indexer':
         specifier: workspace:*
         version: link:apps/indexer
+      '@noble/hashes':
+        specifier: ^2.4.0
+        version: 2.4.0
       better-sqlite3:
         specifier: ^13.0.3
         version: 13.0.3
@@ -62,7 +68,7 @@ importers:
         version: 17.11.0
       jsdom:
         specifier: ^30.0.1
-        version: 30.0.1
+        version: 30.0.1(@noble/hashes@2.4.0)
       prettier:
         specifier: ^3.9.6
         version: 3.9.6
@@ -77,9 +83,30 @@ importers:
         version: 8.69.0(eslint@10.9.1(jiti@2.7.0))(typescript@5.9.3)
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@types/node@26.4.0)(jsdom@30.0.1)(vite@8.2.2(@types/node@26.4.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13))
+        version: 4.1.11(@types/node@26.4.0)(jsdom@30.0.1(@noble/hashes@2.4.0))(vite@8.2.2(@types/node@26.4.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13))
 
   apps/api:
+    dependencies:
+      '@kalibra/adapter-dreamdex':
+        specifier: workspace:*
+        version: link:../../packages/adapter-dreamdex
+      '@kalibra/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@kalibra/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@kalibra/indexer':
+        specifier: workspace:*
+        version: link:../indexer
+      fastify:
+        specifier: ^5.7.1
+        version: 5.12.1
+      zod:
+        specifier: ^4.5.4
+        version: 4.5.4
+
+  apps/guard:
     dependencies:
       '@kalibra/adapter-dreamdex':
         specifier: workspace:*
@@ -919,6 +946,10 @@ packages:
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [win32]
+
+  '@noble/hashes@2.4.0':
+    resolution: {integrity: sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA==}
+    engines: {node: '>= 20.19.0'}
 
   '@nodelib/fs.scandir@2.1.5':
     resolution: {integrity: sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g==}
@@ -3842,7 +3873,9 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
-  '@exodus/bytes@1.15.1': {}
+  '@exodus/bytes@1.15.1(@noble/hashes@2.4.0)':
+    optionalDependencies:
+      '@noble/hashes': 2.4.0
 
   '@fastify/ajv-compiler@4.0.6':
     dependencies:
@@ -4077,6 +4110,8 @@ snapshots:
 
   '@next/swc-win32-x64-msvc@16.3.4':
     optional: true
+
+  '@noble/hashes@2.4.0': {}
 
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
@@ -4701,10 +4736,10 @@ snapshots:
 
   d3-timer@3.0.1: {}
 
-  data-urls@7.0.0:
+  data-urls@7.0.0(@noble/hashes@2.4.0):
     dependencies:
       whatwg-mimetype: 5.0.0
-      whatwg-url: 16.0.1
+      whatwg-url: 16.0.1(@noble/hashes@2.4.0)
     transitivePeerDependencies:
       - '@noble/hashes'
 
@@ -5167,9 +5202,9 @@ snapshots:
 
   hono@4.13.5: {}
 
-  html-encoding-sniffer@6.0.0:
+  html-encoding-sniffer@6.0.0(@noble/hashes@2.4.0):
     dependencies:
-      '@exodus/bytes': 1.15.1
+      '@exodus/bytes': 1.15.1(@noble/hashes@2.4.0)
     transitivePeerDependencies:
       - '@noble/hashes'
 
@@ -5276,17 +5311,17 @@ snapshots:
     dependencies:
       argparse: 2.0.1
 
-  jsdom@30.0.1:
+  jsdom@30.0.1(@noble/hashes@2.4.0):
     dependencies:
       '@asamuzakjp/css-color': 6.0.7
       '@asamuzakjp/dom-selector': 8.3.2
       '@bramus/specificity': 2.4.2
       '@csstools/css-syntax-patches-for-csstree': 1.1.10(css-tree@3.2.1)
-      '@exodus/bytes': 1.15.1
+      '@exodus/bytes': 1.15.1(@noble/hashes@2.4.0)
       css-tree: 3.2.1
-      data-urls: 7.0.0
+      data-urls: 7.0.0(@noble/hashes@2.4.0)
       decimal.js: 10.6.0
-      html-encoding-sniffer: 6.0.0
+      html-encoding-sniffer: 6.0.0(@noble/hashes@2.4.0)
       is-potential-custom-element-name: 1.0.1
       lru-cache: 11.5.2
       parse5: 8.0.1
@@ -5297,7 +5332,7 @@ snapshots:
       w3c-xmlserializer: 5.0.0
       webidl-conversions: 8.0.1
       whatwg-mimetype: 5.0.0
-      whatwg-url: 17.1.0
+      whatwg-url: 17.1.0(@noble/hashes@2.4.0)
       xml-name-validator: 5.0.0
     transitivePeerDependencies:
       - '@noble/hashes'
@@ -6272,7 +6307,7 @@ snapshots:
       jiti: 2.7.0
       tsx: 4.23.13
 
-  vitest@4.1.11(@types/node@26.4.0)(jsdom@30.0.1)(vite@8.2.2(@types/node@26.4.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)):
+  vitest@4.1.11(@types/node@26.4.0)(jsdom@30.0.1(@noble/hashes@2.4.0))(vite@8.2.2(@types/node@26.4.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)):
     dependencies:
       '@vitest/expect': 4.1.11
       '@vitest/mocker': 4.1.11(vite@8.2.2(@types/node@26.4.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13))
@@ -6296,7 +6331,7 @@ snapshots:
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 26.4.0
-      jsdom: 30.0.1
+      jsdom: 30.0.1(@noble/hashes@2.4.0)
     transitivePeerDependencies:
       - msw
 
@@ -6308,17 +6343,17 @@ snapshots:
 
   whatwg-mimetype@5.0.0: {}
 
-  whatwg-url@16.0.1:
+  whatwg-url@16.0.1(@noble/hashes@2.4.0):
     dependencies:
-      '@exodus/bytes': 1.15.1
+      '@exodus/bytes': 1.15.1(@noble/hashes@2.4.0)
       tr46: 6.0.0
       webidl-conversions: 8.0.1
     transitivePeerDependencies:
       - '@noble/hashes'
 
-  whatwg-url@17.1.0:
+  whatwg-url@17.1.0(@noble/hashes@2.4.0):
     dependencies:
-      '@exodus/bytes': 1.15.1
+      '@exodus/bytes': 1.15.1(@noble/hashes@2.4.0)
       tr46: 6.0.0
       webidl-conversions: 8.0.1
     transitivePeerDependencies:
