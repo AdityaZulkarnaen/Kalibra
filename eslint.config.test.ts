@@ -41,6 +41,24 @@ describe('invariant I1 — packages/core performs no I/O', () => {
   );
 });
 
+describe('invariant I1 — packages/core reads no clock, no randomness, no environment', () => {
+  it(
+    'rejects I/O and non-determinism reached through globals, not imports',
+    async () => {
+      const result = await lint('packages/core/src/__fixtures__/io-globals-in-core.ts');
+      const ids = ruleIds(result);
+      expect(ids).toContain('no-restricted-globals');
+      expect(ids).toContain('no-restricted-properties');
+      expect(ids).toContain('no-restricted-syntax');
+      const flagged = result.messages.map((message) => message.message).join(' ');
+      for (const escape of ['fetch', 'process', 'performance', 'Math.random', 'Date.now']) {
+        expect(flagged).toContain(escape);
+      }
+    },
+    TIMEOUT_MS,
+  );
+});
+
 describe('invariant I2 — only the adapter names the venue', () => {
   it(
     'rejects a venue endpoint URL written outside the adapter',

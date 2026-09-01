@@ -48,6 +48,29 @@ const NO_IO_IN_CORE =
 const NO_CLIENT_OUTSIDE_ADAPTER =
   'Only packages/adapter-dreamdex talks to the venue (CLAUDE.md I2). Go through the adapter.';
 
+const NON_DETERMINISTIC =
+  'Scoring is deterministic (CLAUDE.md I6). Pass the clock or the random source in as an argument.';
+
+/**
+ * I1 is about capability, not about imports. `fetch`, `process.env` and `performance.now`
+ * are globals, so without this rule packages/core could reach the network, read the
+ * environment or read a clock without a single import to catch.
+ */
+const NO_IO_GLOBALS = [
+  { name: 'fetch', message: NO_IO_IN_CORE },
+  { name: 'XMLHttpRequest', message: NO_IO_IN_CORE },
+  { name: 'WebSocket', message: NO_IO_IN_CORE },
+  { name: 'EventSource', message: NO_IO_IN_CORE },
+  { name: 'navigator', message: NO_IO_IN_CORE },
+  { name: 'process', message: NO_IO_IN_CORE },
+  { name: 'performance', message: NON_DETERMINISTIC },
+  {
+    name: 'crypto',
+    message:
+      'The global carries getRandomValues (CLAUDE.md I6). Import node:crypto explicitly for a pure hash.',
+  },
+];
+
 /**
  * An endpoint URL outside the adapter breaks the airlock (CLAUDE.md I2).
  *
@@ -112,17 +135,18 @@ export default tseslint.config(
           ],
         },
       ],
+      'no-restricted-globals': ['error', ...NO_IO_GLOBALS],
       'no-restricted-properties': [
         'error',
         {
           object: 'Math',
           property: 'random',
-          message: 'Scoring is deterministic (CLAUDE.md I6). Pass randomness in as an argument.',
+          message: NON_DETERMINISTIC,
         },
         {
           object: 'Date',
           property: 'now',
-          message: 'Scoring is deterministic (CLAUDE.md I6). Pass the clock in as an argument.',
+          message: NON_DETERMINISTIC,
         },
       ],
       'no-restricted-syntax': [
