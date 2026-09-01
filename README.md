@@ -72,7 +72,7 @@ Somnia interaction with a transaction hash or a captured response in `fixtures/`
 `REPLAY` means recorded real data; `SYNTHETIC` means generated data with the real
 integration unverified; `STUB` means the interface exists and the implementation does not.
 
-**As of day 3 of nine (`docs/BUILD_PLAN.md`).** Nothing below has touched real market data.
+**As of day 4 of nine (`docs/BUILD_PLAN.md`).** Nothing below has touched real market data.
 
 | Component | Status | Evidence |
 |---|---|---|
@@ -83,10 +83,11 @@ integration unverified; `STUB` means the interface exists and the implementation
 | `LiveAdapter` | STUB | The `DreamDexAdapter` interface exists; `live.ts` does not. Day 4. No API payload has been captured, and live mode refuses to start rather than pretending. |
 | Persistence (`packages/db`) | SYNTHETIC | Schema extracted verbatim from `docs/API_SPEC.md` §1 into plain SQL and applied to SQLite; a test asserts the Drizzle mirror names exactly the columns the SQL creates. |
 | Ingestion and scoring pipeline (`apps/indexer`) | SYNTHETIC | Ingests every fixture, aggregates 1,112 positions, scores 861 of them, and writes 25 score rows with 250 calibration bins. A second run changes nothing. |
+| Public read API (`apps/api`) | SYNTHETIC | Every endpoint in `docs/API_SPEC.md` §2, with responses parsed by their published Zod schema before they are sent in test mode. The example payloads in that document are parsed by the same schemas, so the spec and the server cannot drift apart without a test failing. |
 | `pnpm demo` | SYNTHETIC | Runs the whole pipeline offline into an in-memory database and asserts the result byte-for-byte against `fixtures/expected/demo-output.json`. |
 
-The public API, the web app, Guard and Arena do not exist yet, so they are not listed —
-there is nothing to claim about them. Rows are added as components land.
+The web app, Guard and Arena do not exist yet, so they are not listed — there is nothing to
+claim about them. Rows are added as components land.
 
 ### What the demo shows
 

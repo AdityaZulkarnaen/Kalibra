@@ -1,0 +1,18 @@
+{
+  "name": "@kalibra/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/lib.ts"
+  },
+  "dependencies": {
+    "@kalibra/core": "workspace:*",
+    "@kalibra/db": "workspace:*",
+    "fastify": "^5.7.1",
+    "zod": "^4.5.4",
+    "@kalibra/adapter-dreamdex": "workspace:*",
+    "@kalibra/indexer": "workspace:*"
+  }
+}
