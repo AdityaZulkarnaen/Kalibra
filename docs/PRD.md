@@ -237,5 +237,5 @@ discovered ones do.
    intervals. The `PROVISIONAL` status and displayed sample size make this visible.
 4. **Settlement trust.** Kalibra reads outcomes from DreamDEX settlement. It does not
    independently verify that settlement was correct.
-5. **Testnet Only.**
-The current deployment operates on testnet. While the core logic and scoring mechanics are fully functional, user behavior without real economic stakes may not perfectly mirror mainnet dynamics. Formal security audits and mainnet deployment represent the next phase of development.
+5. **Testnet Only.** The current deployment operates on testnet. While the core logic and scoring
+  mechanics are fully functional, user behavior without real economic stakes may not perfectly mirror mainnet dynamics. Formal security audits and mainnet deployment represent the next phase of development.
