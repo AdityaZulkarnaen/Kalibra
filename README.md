@@ -87,7 +87,7 @@ run on generated data.
 |---|---|---|
 | Kalibra Score math (`packages/core`) | SYNTHETIC | Every numeric vector in `docs/SCORING_SPEC.md` §8 — V1 through V6 — implemented and green. V1 anchors at exactly 500, V3 scores 528, V4 scores 557, and V5 is strictly monotone across all six edge thresholds. |
 | Aggregation (`packages/core/src/aggregate.ts`) | SYNTHETIC | Stake-weighted price, netting and all five exclusion reasons, asserted against `docs/SCORING_SPEC.md` §4. Output is invariant to the order trades arrive in. |
-| Canonical types and Zod schemas (`packages/adapter-dreamdex`) | SYNTHETIC | Every fixture is parsed by the same schemas a live payload would meet; a checksummed address, an out-of-range probability or a float stake is rejected rather than coerced. The mapping to real venue fields is unverified — `docs/DREAMDEX_ADAPTER.md` §6 has no Verified row. |
+| Canonical types and Zod schemas (`packages/adapter-dreamdex`) | SYNTHETIC | Every fixture is parsed by the same schemas a live payload would meet; a checksummed address, an out-of-range probability or a float stake is rejected rather than coerced. The mapping to real venue fields is verified against captured payloads — `docs/DREAMDEX_ADAPTER.md` §6, where the side and settlement rows are additionally traced end to end in §6.1. |
 | `ReplayAdapter` | SYNTHETIC | Streams the 60 markets, 2,386 trades and 60 settlements in `fixtures/synthetic/`. Deliberately **not** labelled REPLAY: that data is generated, not recorded. |
 | `LiveAdapter` | **LIVE** | Reads the Shannon testnet indexer and has ingested real trades: 6 markets, 14 fills, 10 distinct wallets. Evidence in [`fixtures/recorded/dreamdex-testnet-2026-09-01/`](fixtures/recorded/) and transaction hash `0xe3299c8843bebddb104aae2b3ae0a10c5c37f7cfc379cc9fd47050162cf7e842`. Read-only: writing needs a funded signer, which is day 7. |
 | Persistence (`packages/db`) | SYNTHETIC | Schema extracted verbatim from `docs/API_SPEC.md` §1 into plain SQL and applied to SQLite; a test asserts the Drizzle mirror names exactly the columns the SQL creates. |
@@ -114,10 +114,14 @@ fill the UP leg risks 99.80 and the DOWN leg risks 100.20, summing to the 200.00
 quantity. A trader long UP at probability p risks p·q; a trader long DOWN risks (1−p)·q.
 Using the premium for both would have overstated every DOWN position's conviction.
 
-It is read-only. Nothing in this repository has ever sent a transaction, and `placeOrder`
-throws rather than returning a plausible-looking rejection. The scoring the demo shows still
-runs on synthetic fixtures, because a hackathon-length live window has too few resolved
-positions to rank anyone.
+`placeOrder` is implemented as of 2 Sep, but **nothing in this repository has yet sent a
+transaction**: the write path needs a funded Shannon signer and none is configured. With no
+`GUARD_SIGNER_KEY`, Guard still evaluates and logs every order and the adapter refuses to
+write, which is visible at startup rather than silent. This section will carry a transaction
+hash when one exists, and not before.
+
+The scoring the demo shows still runs on synthetic fixtures, because a hackathon-length live
+window has too few resolved positions to rank anyone.
 
 ### What the demo shows
 
