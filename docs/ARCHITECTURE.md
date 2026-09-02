@@ -290,20 +290,24 @@ malformed variable is a startup crash, never a silent default.
 
 ```
 KALIBRA_MODE=replay|live         default: replay
-KALIBRA_DB_PATH=./kalibra.db
-DREAMDEX_REST_URL=               unverified, see DREAMDEX_ADAPTER.md
-DREAMDEX_WS_URL=                 unverified
-DREAMDEX_API_KEY=                unverified whether required
-SOMNIA_RPC_URL=
-GUARD_WALLET_PRIVATE_KEY=        guard only, never logged
+KALIBRA_DB_PATH=./kalibra.db     indexer, api and guard all open this
+DREAMDEX_INDEXER_URL=            live mode only, no default; testnet value in
+                                 DREAMDEX_ADAPTER.md U19, read surface needs no key
+DREAMDEX_MARKET_LIMIT=10         markets per live pass, 1..500
+API_PORT=3001
 GUARD_PORT=3002
 GUARD_POLICY_PATH=./guard.policy.json
 GUARD_OPERATOR_TOKEN=            unset means the operator routes are not registered
 GUARD_AGENT_WALLETS=             agentId=0xwallet pairs, comma separated
-API_PORT=3001
 KALIBRA_API_URL=http://127.0.0.1:3001   apps/web reads the index from here
-WEB_PORT=3000
 ```
+
+That list is exhaustive: it is every variable any package reads. Nothing loads a `.env`
+file automatically — there is no dotenv in the runtime path and the `package.json`
+scripts pass no `--env-file`.
+
+Live writes are not built, so there is no signing key here yet. When `LiveAdapter` gains
+a write path this section gains the variable in the same commit, and not before.
 
 `KALIBRA_MODE` defaults to `replay`. Running the repository with no configuration at all
 produces a working offline demo rather than a connection error. This is a deliberate
