@@ -21,5 +21,7 @@ export default defineConfig({
     ],
     exclude: ['**/node_modules/**', '**/dist/**', '**/__fixtures__/**'],
     environment: 'node',
+    // Vitest loads .env into process.env. See vitest.setup.ts for why that has to be undone.
+    setupFiles: ['./vitest.setup.ts'],
   },
 });

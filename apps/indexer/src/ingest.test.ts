@@ -28,7 +28,7 @@ afterEach(() => {
   opened.close();
 });
 
-describe('runIngest over the synthetic fixtures', () => {
+describe('runIngest over the synthetic fixtures', { timeout: 30_000 }, () => {
   it('lands every market, trade and settlement', async () => {
     const adapter = await ReplayAdapter.fromDirectory(FIXTURES);
     const summary = await runIngest(adapter, opened.db, { ingestedAt: INGESTED_AT });

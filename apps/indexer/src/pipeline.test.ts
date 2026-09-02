@@ -32,7 +32,15 @@ afterEach(() => {
   opened.close();
 });
 
-describe('the full pipeline over the synthetic fixtures', () => {
+/**
+ * Every test here runs the whole pipeline from an empty database: 2,386 trades ingested,
+ * 1,112 positions aggregated, 25 wallets scored. That is seconds of real work, not the
+ * milliseconds the default timeout assumes, and under a loaded parallel run it was tipping
+ * over five seconds and failing as a timeout rather than as a wrong answer.
+ */
+const PIPELINE_TIMEOUT_MS = 30_000;
+
+describe('the full pipeline over the synthetic fixtures', { timeout: PIPELINE_TIMEOUT_MS }, () => {
   it('produces a score row for every one of the 25 wallets', async () => {
     await ingestAndScore();
     const rows = listScores(opened.db);
