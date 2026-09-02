@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -6,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { MalformedPayloadError, UnsupportedOperationError } from './adapter.js';
 import type { CanonicalTrade } from './canonical.js';
 import { LiveAdapter, toCanonicalSide, type FetchLike } from './live.js';
+import { fillsResponse, marketsResponse } from './venue.js';
 
 /**
  * DREAMDEX_ADAPTER.md §5 Step 5: LiveAdapter is tested against the payloads captured from
@@ -137,6 +139,27 @@ describe('LiveAdapter over the captured testnet payloads', () => {
     expect(quote.lastUp as number).toBeCloseTo(0.709, 9);
   });
 
+  /**
+   * U21, closed. A mint-a-pair fill crosses two buyers with no seller at all, which is the
+   * one crossing path where side attribution could have been ambiguous. It is not: each leg
+   * carries its own side, and the two collateral shares sum to the contract.
+   */
+  it('attributes both legs of a mint-a-pair fill, which is U21', async () => {
+    const trades = await drain((await adapter()).streamTrades({}));
+    const taker = trades.find((trade) => trade.tradeId === '476784429_114:taker');
+    const maker = trades.find((trade) => trade.tradeId === '476784429_114:maker');
+
+    // takerSide BUY_YES, makerSide BUY_NO: two buyers, opposite sides, no seller.
+    expect(taker?.side).toBe('UP');
+    expect(maker?.side).toBe('DOWN');
+
+    // quantity 6000000, quoteQuantity 3720000 at a fill price of 0.62. The UP buyer posts
+    // p*q and the DOWN buyer posts (1-p)*q; together they fund the minted pair exactly.
+    expect(taker?.stake).toBe(3_720_000n);
+    expect(maker?.stake).toBe(2_280_000n);
+    expect((taker?.stake as bigint) + (maker?.stake as bigint)).toBe(6_000_000n);
+  });
+
   it('refuses to write, because it has no signer', async () => {
     const live = await adapter();
     expect(() =>
@@ -176,5 +199,36 @@ describe('LiveAdapter on a venue that misbehaves', () => {
       ),
     );
     await expect(live.listMarkets()).rejects.toThrow(MalformedPayloadError);
+  });
+});
+
+describe('what the captured tape establishes about the venue', () => {
+  const read = (name: string): unknown =>
+    JSON.parse(readFileSync(join(CAPTURED, name), 'utf8')) as unknown;
+
+  /**
+   * G0.2. Every market this adapter ingests is an Event Contract, not spot. Three fields
+   * say so independently: the declared type, the oracle question the outcome resolves
+   * against, and the pair of ERC-6909 outcome token ids. A spot market carries none.
+   */
+  it('ingests Event Contract markets, never spot', () => {
+    const parsed = marketsResponse.parse(read('market.json'));
+    const markets = parsed.data?.Market ?? [];
+    expect(markets.length).toBeGreaterThan(0);
+    for (const market of markets) {
+      expect(market.marketType).toBe('BINARY');
+      expect(market.oracleQuestionId).not.toBeNull();
+      expect(market.yesTokenId).not.toBeNull();
+      expect(market.noTokenId).not.toBeNull();
+      expect(market.yesTokenId).not.toBe(market.noTokenId);
+    }
+  });
+
+  /** The crossing path is read rather than discarded, so U21's evidence stays checkable. */
+  it('parses the crossing path, including the mint-a-pair one', () => {
+    const parsed = fillsResponse.parse(read('fills.json'));
+    const kinds = (parsed.data?.Fill ?? []).map((fill) => fill.kind);
+    expect(kinds).toContain('DIRECT_YES');
+    expect(kinds).toContain('MINT_A_PAIR');
   });
 });

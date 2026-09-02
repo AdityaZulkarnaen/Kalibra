@@ -30,7 +30,22 @@ export const venueMarketSchema = z.object({
   /** 0 is the YES outcome, 1 is NO. Null until resolution. */
   winningOutcome: z.number().int().nullable(),
   resolvedAtTimestamp: numericString.nullable(),
+  /**
+   * The payout vector, indexed by outcome. It says which outcome pays without reference to
+   * `winningOutcome`, which makes it an independent check on that label rather than a
+   * restatement of it. Absent until the market resolves.
+   */
+  payoutNumerators: z.array(numericString).nullable(),
+  payoutDenominator: numericString.nullable(),
   poolAddress: address,
+  /**
+   * Event-contract identity, and the answer to G0.2. A binary market carries an oracle
+   * question and a pair of ERC-6909 outcome ids; a spot market has none of the three.
+   * Nullable because absence is a fact worth reading, not a parse failure.
+   */
+  oracleQuestionId: z.string().nullable(),
+  yesTokenId: numericString.nullable(),
+  noTokenId: numericString.nullable(),
   quoteDecimals: z.number().int().min(0).max(36),
 });
 
@@ -46,6 +61,13 @@ export const venueFillSchema = z.object({
   taker: address,
   makerSide: venueSideSchema.nullable(),
   takerSide: venueSideSchema.nullable(),
+  /**
+   * The crossing path. `DIRECT_YES` and `MINT_A_PAIR` are captured; the documentation
+   * names two more and neither has been seen. Deliberately a string rather than an enum:
+   * an unobserved path must not reject an otherwise valid row (CLAUDE.md §1). Both legs
+   * carry their own side whatever the path, which is what closes U21.
+   */
+  kind: z.string().nullable(),
   fillPrice: numericString,
   quantity: numericString,
   /** The collateral that changed hands: quantity times price, in quote base units. */
@@ -79,10 +101,11 @@ export const fillsResponse = graphqlEnvelope(z.object({ Fill: z.array(venueFillS
 export const ordersResponse = graphqlEnvelope(z.object({ Order: z.array(venueOrderSchema) }));
 
 export const MARKET_FIELDS = `marketId marketType asset question strike expiry tradingStart
-  clobStatus finalized voided winningOutcome resolvedAtTimestamp poolAddress quoteDecimals`;
+  clobStatus finalized voided winningOutcome resolvedAtTimestamp poolAddress quoteDecimals
+  oracleQuestionId yesTokenId noTokenId payoutNumerators payoutDenominator`;
 
 export const FILL_FIELDS = `id blockNumber logIndex timestamp txHash market_id maker taker
-  makerSide takerSide fillPrice quantity quoteQuantity`;
+  makerSide takerSide kind fillPrice quantity quoteQuantity`;
 
 export const ORDER_FIELDS = `orderId owner side price quantityRemaining rested placedAtBlock
   lastUpdatedAtBlock`;

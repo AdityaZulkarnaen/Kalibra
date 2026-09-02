@@ -21,7 +21,8 @@
     "record": "tsx scripts/record.ts",
     "web": "pnpm --filter @kalibra/web dev",
     "web:build": "pnpm --filter @kalibra/web build",
-    "guard": "tsx apps/guard/src/index.ts"
+    "guard": "tsx apps/guard/src/index.ts",
+    "verify-attribution": "tsx scripts/verify-attribution.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "@kalibra/core": "workspace:*",
+    "@somnia-chain/markets-sdk": "^0.28.0",
+    "viem": "^2.40.0",
     "zod": "^4.5.4"
   }
 }

@@ -4,3 +4,6 @@ export * from './canonical.js';
 export * from './live.js';
 export * from './replay.js';
 export * from './venue.js';
+export * from './attest.js';
+export * from './attest-chain.js';
+export * from './somnia.js';
