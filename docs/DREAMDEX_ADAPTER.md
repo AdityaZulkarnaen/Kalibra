@@ -242,16 +242,62 @@ only. The source column names GraphQL fields on the indexer at
 | `CanonicalMarket.status` | `Market.clobStatus`, plus `finalized` and `voided` | `Finalized` + `voided` → VOID, `Finalized` → SETTLED, else OPEN/CLOSED | ☑ |
 | `CanonicalTrade.tradeId` | `Fill.id`, already `${blockNumber}_${logIndex}` | as given — a natural idempotency key | ☑ |
 | `CanonicalTrade.wallet` | `Fill.taker`, and `Fill.maker` for the other leg | lowercase | ☑ |
-| `CanonicalTrade.side` | `Fill.takerSide` / `makerSide`: `BUY_YES`, `SELL_YES`, `BUY_NO`, `SELL_NO` | BUY_YES and SELL_NO → UP; SELL_YES and BUY_NO → DOWN | ☑ |
+| `CanonicalTrade.side` | `Fill.takerSide` / `makerSide`: `BUY_YES`, `SELL_YES`, `BUY_NO`, `SELL_NO` | BUY_YES and SELL_NO → UP; SELL_YES and BUY_NO → DOWN | ☑ **traced**, §6.1 |
 | `CanonicalTrade.impliedProbUp` | **not** `Fill.fillPrice` — the reconstructed mid at block − 1. See 7.2 | already in [0,1] at `quoteDecimals`; clamp per `SCORING_SPEC.md` §2 | ☑ |
 | `CanonicalTrade.stake` | `Fill.quoteQuantity`, the collateral that changed hands | as given, bigint base units | ☑ |
 | `CanonicalTrade.stakeDecimals` | `Market.quoteDecimals` — **6** on testnet | carry, never normalise | ☑ |
 | `CanonicalTrade.timestamp` | `Fill.timestamp`, seconds | × 1000 | ☑ |
 | `CanonicalTrade.txHash` | `Fill.txHash` | lowercase | ☑ |
-| `CanonicalSettlement.outcome` | `Market.voided`, `Market.winningOutcome` (0 = YES) | voided → VOID, 0 → UP, 1 → DOWN | ☑ |
+| — (provenance only) | `Fill.kind`: the crossing path, e.g. `DIRECT_YES`, `MINT_A_PAIR` | parsed as an open string, not an enum — an unobserved path must not reject a valid row | ☑ |
+| `CanonicalSettlement.outcome` | `Market.voided`, `Market.winningOutcome` (0 = YES) | voided → VOID, 0 → UP, 1 → DOWN | ☑ **traced**, §6.1 |
 | `CanonicalSettlement.settledAt` | `Market.resolvedAtTimestamp`, seconds | × 1000 | ☑ |
 | `CanonicalQuote.midUp` | derived from `Order` rows: `price`, `side`, `rested`, `quantityRemaining`, `placedAtBlock`, `lastUpdatedAtBlock` | reconstruct at block − 1; see 7.2 | ☑ |
 | `CanonicalOrder` → venue request | `exchange.createOrder(symbol, 'limit', side, qty, price)` | quantise to tick and lot first | ☐ |
+
+### 6.1 Verified end to end — side attribution, 2 Sep 2026
+
+The mapping table above says what a field is *called*. This says the stored side is the side
+that actually won money, which is a different claim and the one that matters: an inverted
+UP/DOWN mapping flips every score, throws nothing, and leaves no number looking wrong.
+
+Checking the stored side against `Market.winningOutcome` would be circular — that is the
+field the adapter already trusts. So `pnpm verify-attribution` reads four sources that do not
+depend on one another, on **two markets that settled in opposite directions**, because a
+symmetric inversion passes a one-direction check perfectly.
+
+| Layer | Source | Why it is independent |
+|---|---|---|
+| A | `getMarketResolution` opening vs closing answer | Reproduces the comparison the contract settled on, with no label involved |
+| B | `Market.payoutNumerators` | Names the paying *index*, never a direction — a check on `winningOutcome`, not a restatement |
+| C | `getMarketOnchain` | Resolves through the module registry, so the indexer cannot supply its own alibi |
+| D | ERC-6909 `balanceOf(wallet, yesId/noId)` | The only layer linking "bought YES on the tape" to "holds the token that pays" |
+
+| | `0x…00ff46` (BTC, 15m) | `0x…010e48` (BTC, 1h) |
+|---|---|---|
+| A oracle, open → close | 7787732 → 7795872 = **UP** | 7763542 → 7758409 = **DOWN** |
+| B payout vector | `[10000000, 0]` pays index **0** | `[0, 10000000]` pays index **1** |
+| C chain `winningOutcome` | **0** | **1** |
+| Adapter stored | **UP** | **DOWN** |
+
+Layer D is what closes the loop, and one wallet supplies the control: `0x93e300…` appears in
+both markets on opposite sides and holds the matching outcome token each time — `BUY_NO` in
+`00ff46` holding 6,000,000 of the NO id, `BUY_YES` in `010e48` holding 2,000,000 of the YES
+id. A YES buyer holds the YES id, and the payout vector pays index 0 exactly when the oracle
+says Up won.
+
+A wallet reading zero on both ids has redeemed or closed. That is reported as **unobserved**,
+never as a pass, and the script refuses to report success on one direction alone.
+
+Raw evidence and the full leg-by-leg trace: `fixtures/recorded/attribution-2026-09-02/`.
+
+**Event Contracts, not spot (G0.2).** The same run confirmed that all ten markets a live
+ingest pulls in are event contracts: every one is `marketType: "BINARY"`, carries an
+`oracleQuestionId`, and has a distinct `yesTokenId`/`noTokenId` pair on the ERC-6909
+singleton. A spot market has none of the three. The venue documentation is independently
+explicit that the HTTP API covers spot only and has no event-contract endpoints (U13); this
+repository never calls it. Evidence in `ingested-market-types.json` in the same directory.
+
+---
 
 ## 7. Unknowns checklist
 
@@ -267,7 +313,7 @@ code without a fallback.
 |---|---|---|---|
 | U1 | REST base URL and WS URL for testnet | Live mode cannot connect | DOC, but **not the path we need** — the spot HTTP API is `https://stg.api.dreamdex.io/v0` on testnet with WS `wss://stg.api.dreamdex.io/v0/ws/public`, and per U13 it serves no event contracts. The event-contract surface is the SDK. See U19 |
 | U2 | Auth scheme for public market data | Live mode cannot connect | DOC — SIWE (ERC-4361) is documented for the spot HTTP API. Event-contract market data is chain and indexer reads; no authentication is documented for reading, and a private key is documented only for writes |
-| U3 | UP/DOWN as separate instruments or one with a side flag | Side normalisation inverted; **every score wrong and the error is invisible** | **VERIFIED** — one book, four side values: `BUY_YES`, `SELL_YES`, `BUY_NO`, `SELL_NO` |
+| U3 | UP/DOWN as separate instruments or one with a side flag | Side normalisation inverted; **every score wrong and the error is invisible** | **VERIFIED, and traced end to end 2 Sep 2026.** One book, four side values: `BUY_YES`, `SELL_YES`, `BUY_NO`, `SELL_NO`. The mapping is no longer the claim — §6.1 traces the stored side to the money on two markets that settled in opposite directions, against four independent sources |
 | U4 | Price quote units | `impliedProbUp` out of range or silently scaled wrong | **VERIFIED** — `fillPrice: "614000"` at `quoteDecimals: 6` is 0.614 |
 | U5 | Historical trade endpoint and depth | No backfill; scores only from indexer start | **VERIFIED** — a settled market returns its full fill tape and every order that ever rested on it |
 | U6 | Settlement publication mechanism | Outcomes never arrive; nothing ever scores | DOC — an oracle posts the answer at expiry and on-chain reactivity delivers it to the module callback; no keeper. Backstops: `pokeOracle(questionId)` and permissionless `voidExpired()`. 7.1(c) |
@@ -285,10 +331,10 @@ code without a fallback.
 | U18 | `SCORING_SPEC.md` §2 wants the **mid at execution**, but the venue serves a fill tape and derivable order rows, not a mid time series | Using the fill price instead conflates forecasting skill with execution quality — the exact error §2 exists to prevent | **DECIDED 1 Sep 2026: reconstruct the book.** See 7.2 |
 | U19 | The `indexerUrl` the SDK client is constructed with | Without it `LiveAdapter` cannot be constructed at all | **VERIFIED** — testnet `https://dev.smk.somnia.host/v1/graphql`; a GraphQL indexer, queried directly in the capture |
 | U20 | Is reading another wallet's fills permissionless | If privileged, U10 collapses back to Plan B or C | **VERIFIED — permissionless.** The capture was taken anonymously: no key, no wallet, no signature |
-| U21 | How a mint-a-pair fill appears in the tape | Buy Up × Buy Down crosses with no seller and the pool mints a fresh pair. If it is one row, side attribution for one of the two counterparties is ambiguous | OPEN — affects `CanonicalTrade` construction and therefore §4.1 aggregation |
+| U21 | How a mint-a-pair fill appears in the tape | Buy Up × Buy Down crosses with no seller and the pool mints a fresh pair. If it is one row, side attribution for one of the two counterparties is ambiguous | **CLOSED 2 Sep 2026** — one row carrying `kind: "MINT_A_PAIR"`, with each leg keeping its own side (`takerSide: BUY_YES`, `makerSide: BUY_NO`). Not ambiguous, and no special case needed. The two stakes are each buyer's own share of the collateral and sum to the contract quantity; the `BUY_NO` buyer was confirmed on-chain to hold the whole minted NO side. Fill `476784429_114`, §6.1 |
 
 | U22 | `Market.strike` is `"0"` on the captured market, whose question reads "closes at or above its opening price", but sibling markets carry concrete strikes such as `245100` | A strike read as an opening-price reference, or the reverse, mislabels what the contract actually claims | OPEN — both shapes exist on testnet. The scale of a non-zero strike is also unconfirmed. Only the `"0"` shape has been captured end to end |
-| U23 | The book is four-sided, and a `BUY_YES` can cross a `BUY_NO` by minting a pair rather than matching a seller | Folding NO orders into the UP frame is the one inversion in the codebase; getting it backwards inverts every reconstructed mid | **VERIFIED for the fold** — the reconstruction is uncrossed at all three captured fills. Mint-a-pair crossing is documented but not yet observed in a capture |
+| U23 | The book is four-sided, and a `BUY_YES` can cross a `BUY_NO` by minting a pair rather than matching a seller | Folding NO orders into the UP frame is the one inversion in the codebase; getting it backwards inverts every reconstructed mid | **VERIFIED** — the reconstruction is uncrossed at all three captured fills, and mint-a-pair crossing is now observed rather than merely documented. See U21 |
 | U24 | A fully-filled order keeps its price in the order rows | Counted as liquidity it silently crosses the book and corrupts the mid | **VERIFIED** — filter on `rested` and `quantityRemaining > 0`. This mistake was made and caught during the capture |
 
 **U3 and U10 were the existential pair. Both are now VERIFIED by capture**, and so is U20,
@@ -296,9 +342,11 @@ the question they rested on. Reading another wallet's fills needs no key: the pa
 `fixtures/recorded/dreamdex-testnet-2026-09-01/` were taken anonymously. Plan A stands
 without a fallback being needed.
 
-What remains open is narrower and none of it is existential: U22 (what a non-zero strike
-means and at what scale), U23 (mint-a-pair crossing, documented but not yet observed), and
-the write path, which is untested because it needs a funded wallet.
+U3 has since been traced to the money rather than merely mapped (§6.1), on two markets that
+settled in opposite directions, and U21 and U23 closed with it.
+
+What remains open is narrower and none of it is existential: U22, what a non-zero strike
+means and at what scale.
 
 ### 7.1 Discovery log
 

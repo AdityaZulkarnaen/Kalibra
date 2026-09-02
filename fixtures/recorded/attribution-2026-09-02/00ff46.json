@@ -1,0 +1,100 @@
+{
+  "marketId": "0x000000000000000000000000000000000000000000000000000000000000ff46",
+  "underlying": "BTC",
+  "question": "BTC closes at or above its opening price",
+  "strike": "0",
+  "adapterOutcome": "UP",
+  "oracle": {
+    "opening": "7787732",
+    "closing": "7795872",
+    "direction": "UP"
+  },
+  "payout": {
+    "numerators": [
+      "10000000",
+      "0"
+    ],
+    "denominator": "10000000",
+    "payingIndex": 0
+  },
+  "chain": {
+    "isResolved": true,
+    "isVoided": false,
+    "winningOutcome": 0,
+    "outcomeToken": "0xB52c5934113Af5c0Bb20eb3C72290C8215f755b9",
+    "yesId": "6067472134721325687293984736504707062498260636974376553997493598178816",
+    "noId": "6067472134721325687293984736504707062498260636974376553997493598178817",
+    "status": 4
+  },
+  "legs": [
+    {
+      "tradeId": "476784269_137:taker",
+      "wallet": "0x333c45737d453f8f98e2d8976bcfa43aa9610795",
+      "venueSide": "BUY_YES",
+      "kind": "DIRECT_YES",
+      "canonicalSide": "UP",
+      "stake": "28557754",
+      "yesBalance": "0",
+      "noBalance": "0",
+      "won": true
+    },
+    {
+      "tradeId": "476784269_137:maker",
+      "wallet": "0xd5eaab837384a3390a20a4bd313ca4721cdd02ad",
+      "venueSide": "SELL_YES",
+      "kind": "DIRECT_YES",
+      "canonicalSide": "DOWN",
+      "stake": "17953246",
+      "yesBalance": null,
+      "noBalance": null,
+      "won": false
+    },
+    {
+      "tradeId": "476784429_114:taker",
+      "wallet": "0xd5eaab837384a3390a20a4bd313ca4721cdd02ad",
+      "venueSide": "BUY_YES",
+      "kind": "MINT_A_PAIR",
+      "canonicalSide": "UP",
+      "stake": "3720000",
+      "yesBalance": null,
+      "noBalance": null,
+      "won": true
+    },
+    {
+      "tradeId": "476784429_114:maker",
+      "wallet": "0x93e300607c363e7d7a47e50f5c9fdf1723e859cf",
+      "venueSide": "BUY_NO",
+      "kind": "MINT_A_PAIR",
+      "canonicalSide": "DOWN",
+      "stake": "2280000",
+      "yesBalance": "0",
+      "noBalance": "6000000",
+      "won": false
+    },
+    {
+      "tradeId": "476786702_119:taker",
+      "wallet": "0xec861bcbd9fe09b8522cbb465252f495e32e1634",
+      "venueSide": "BUY_YES",
+      "kind": "DIRECT_YES",
+      "canonicalSide": "UP",
+      "stake": "141800000",
+      "yesBalance": "0",
+      "noBalance": "0",
+      "won": true
+    },
+    {
+      "tradeId": "476786702_119:maker",
+      "wallet": "0xd5eaab837384a3390a20a4bd313ca4721cdd02ad",
+      "venueSide": "SELL_YES",
+      "kind": "DIRECT_YES",
+      "canonicalSide": "DOWN",
+      "stake": "58200000",
+      "yesBalance": null,
+      "noBalance": null,
+      "won": false
+    }
+  ],
+  "agrees": true,
+  "disagreements": [],
+  "unobserved": []
+}

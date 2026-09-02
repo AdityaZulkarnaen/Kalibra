@@ -1,0 +1,78 @@
+{
+  "marketId": "0x0000000000000000000000000000000000000000000000000000000000010e48",
+  "underlying": "BTC",
+  "question": "BTC closes at or above its opening price",
+  "strike": "0",
+  "adapterOutcome": "DOWN",
+  "oracle": {
+    "opening": "7763542",
+    "closing": "7758409",
+    "direction": "DOWN"
+  },
+  "payout": {
+    "numerators": [
+      "0",
+      "10000000"
+    ],
+    "denominator": "10000000",
+    "payingIndex": 1
+  },
+  "chain": {
+    "isResolved": true,
+    "isVoided": false,
+    "winningOutcome": 1,
+    "outcomeToken": "0xB52c5934113Af5c0Bb20eb3C72290C8215f755b9",
+    "yesId": "1759536965449878170875608066465584347052299509667894542540076914594560",
+    "noId": "1759536965449878170875608066465584347052299509667894542540076914594561",
+    "status": 4
+  },
+  "legs": [
+    {
+      "tradeId": "477566328_28:taker",
+      "wallet": "0x93e300607c363e7d7a47e50f5c9fdf1723e859cf",
+      "venueSide": "BUY_YES",
+      "kind": "DIRECT_YES",
+      "canonicalSide": "UP",
+      "stake": "666000",
+      "yesBalance": "2000000",
+      "noBalance": "0",
+      "won": false
+    },
+    {
+      "tradeId": "477566328_28:maker",
+      "wallet": "0xd1db9d7969857e2c05bc2240280f68f164047bb9",
+      "venueSide": "SELL_YES",
+      "kind": "DIRECT_YES",
+      "canonicalSide": "DOWN",
+      "stake": "1334000",
+      "yesBalance": "0",
+      "noBalance": "0",
+      "won": true
+    },
+    {
+      "tradeId": "477575055_6:taker",
+      "wallet": "0x54001362b87792d4cb2c9bc8ed06421a899156e7",
+      "venueSide": "BUY_YES",
+      "kind": "DIRECT_YES",
+      "canonicalSide": "UP",
+      "stake": "293000",
+      "yesBalance": "1000000",
+      "noBalance": "0",
+      "won": false
+    },
+    {
+      "tradeId": "477575055_6:maker",
+      "wallet": "0xd1db9d7969857e2c05bc2240280f68f164047bb9",
+      "venueSide": "SELL_YES",
+      "kind": "DIRECT_YES",
+      "canonicalSide": "DOWN",
+      "stake": "707000",
+      "yesBalance": "0",
+      "noBalance": "0",
+      "won": true
+    }
+  ],
+  "agrees": true,
+  "disagreements": [],
+  "unobserved": []
+}
