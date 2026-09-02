@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 
 import { openDatabase } from '@kalibra/db';
 
-import { resolveAdapter } from './adapter.js';
-import { guardConfigSchema, parseAgentWallets } from './config.js';
+import { resolveVenue } from './adapter.js';
+import { guardConfigSchema } from './config.js';
 import { Guard } from './guard.js';
 import { parsePolicy } from './policy-file.js';
 import { buildGuardServer } from './server.js';
@@ -15,14 +15,9 @@ import { buildGuardServer } from './server.js';
 const config = guardConfigSchema.parse(process.env);
 const policy = parsePolicy(JSON.parse(readFileSync(config.GUARD_POLICY_PATH, 'utf8')));
 const { db } = openDatabase(config.KALIBRA_DB_PATH);
-const { adapter, description } = await resolveAdapter(config);
+const { adapter, adapterFor, wallets, description } = await resolveVenue(config);
 
-const guard = new Guard({
-  db,
-  adapter,
-  policy,
-  wallets: parseAgentWallets(config.GUARD_AGENT_WALLETS),
-});
+const guard = new Guard({ db, adapter, adapterFor, policy, wallets });
 
 const app = buildGuardServer({
   guard,
@@ -36,6 +31,11 @@ console.log(
   `policy ${policy.policyId} v${policy.version}, ${policy.allowedMarkets.length} markets allowed`,
 );
 console.log(`venue  ${description}`);
+for (const [agentId, wallet] of wallets) {
+  // The address, never the key: an operator needs to confirm the wallet is the one they
+  // meant, and nothing here should make a secret easier to leak into a terminal scrollback.
+  console.log(`agent  ${agentId} -> ${wallet}`);
+}
 if (config.GUARD_OPERATOR_TOKEN === undefined) {
   console.log('operator routes are not registered: GUARD_OPERATOR_TOKEN is unset');
 }

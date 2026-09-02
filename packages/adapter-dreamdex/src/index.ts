@@ -8,3 +8,4 @@ export * from './attest.js';
 export * from './attest-chain.js';
 export * from './somnia.js';
 export * from './writer.js';
+export * from './keys.js';

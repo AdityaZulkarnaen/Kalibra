@@ -40,7 +40,14 @@ import { withKillSwitch } from './policy-file.js';
 
 export interface GuardOptions {
   readonly db: KalibraDatabase;
+  /** Reads: quotes and marks. Shared across agents, and needs no signer. */
   readonly adapter: DreamDexAdapter;
+  /**
+   * Writes: the adapter that signs as this agent. Each agent trades from its own wallet, so
+   * the order has to leave through its own signer or Arena would rank one trader many times.
+   * Absent, every agent shares `adapter`, which is what replay mode wants.
+   */
+  readonly adapterFor?: (agentId: string) => DreamDexAdapter;
   readonly policy: GuardPolicy;
   /** agentId to the wallet its fills are attributed to, for Arena scoring. */
   readonly wallets: ReadonlyMap<string, string>;
@@ -150,9 +157,10 @@ export class Guard {
       return refused(decision, auditSeq);
     }
 
+    const venue = this.venueFor(agentId);
     let accepted: Awaited<ReturnType<DreamDexAdapter['placeOrder']>>;
     try {
-      accepted = await this.options.adapter.placeOrder(order);
+      accepted = await venue.placeOrder(order);
     } catch (cause) {
       // Rule 11. The order never reached the venue, and the agent must not treat it as
       // placed, so the failure is written to the chain as a decision of its own.
@@ -244,6 +252,10 @@ export class Guard {
     });
     appendAuditEntry(this.options.db, entry);
     return entry.seq;
+  }
+
+  private venueFor(agentId: string): DreamDexAdapter {
+    return this.options.adapterFor?.(agentId) ?? this.options.adapter;
   }
 
   private ledgerFor(agentId: string): AgentLedger {

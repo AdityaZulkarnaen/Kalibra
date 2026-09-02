@@ -14,7 +14,12 @@ export const guardConfigSchema = z.object({
    * anyone who reaches the port can flip is not a kill switch.
    */
   GUARD_OPERATOR_TOKEN: z.string().min(16).optional(),
-  /** agentId=wallet pairs, comma separated. Guard fills are attributed to these. */
+  /**
+   * agentId=wallet pairs, comma separated. Only needed for an agent with no key here —
+   * an agent whose key Guard holds has its wallet derived from that key instead, because a
+   * hand-written address that disagrees with its key fails silently and misattributes every
+   * fill.
+   */
   GUARD_AGENT_WALLETS: z.string().default(''),
 
   /** replay forwards to the fixture adapter and reaches no network. */
@@ -23,21 +28,22 @@ export const guardConfigSchema = z.object({
   DREAMDEX_INDEXER_URL: z.url().optional(),
 
   /**
-   * The signing key Guard places orders with, and the reason Guard is a risk envelope
-   * rather than a polite API.
+   * The signing keys Guard places orders with, as `agentId=0xkey` pairs, and the reason
+   * Guard is a risk envelope rather than a polite API.
    *
    * RISK_POLICY_SPEC.md section 1 says an agent cannot reach the venue except through
    * Guard. Nothing in the policy engine makes that true — what makes it true is that this
    * key lives in Guard's process and the agent never holds one. An agent with its own key
    * bypasses every rule here by calling the venue directly.
    *
-   * Absent, Guard runs read-only: orders are evaluated and logged but the adapter refuses
-   * to write. That is the honest degradation, not a silent no-op.
+   * One key per agent, because each agent trades from its own wallet: sharing one would
+   * collapse every agent onto a single leaderboard row, and the point of Arena is that each
+   * agent carries its own track record.
+   *
+   * Empty, Guard runs read-only: orders are evaluated and logged but the adapter refuses to
+   * write. That is the honest degradation, not a silent no-op.
    */
-  GUARD_SIGNER_KEY: z
-    .string()
-    .regex(/^0x[0-9a-fA-F]{64}$/, 'expected a 0x-prefixed 32-byte hex private key')
-    .optional(),
+  GUARD_AGENT_KEYS: z.string().default(''),
   /** Override for the chain WebSocket. The SDK's Shannon definition carries one already. */
   SOMNIA_WS_RPC_URL: z.string().optional(),
   /** How long a resting order survives, in ms — the dead-man's switch for a crashed agent. */
@@ -57,4 +63,25 @@ export function parseAgentWallets(raw: string): Map<string, string> {
     wallets.set(agentId, wallet.toLowerCase());
   }
   return wallets;
+}
+
+/**
+ * `agentId=0xkey` pairs. The keys are never logged and never leave this process; only the
+ * addresses they derive are printed, so an operator can confirm the wallet is the one they
+ * meant without the key appearing anywhere.
+ */
+export function parseAgentKeys(raw: string): Map<string, `0x${string}`> {
+  const keys = new Map<string, `0x${string}`>();
+  for (const pair of raw.split(',').map((part) => part.trim())) {
+    if (pair === '') continue;
+    const separator = pair.indexOf('=');
+    const agentId = separator === -1 ? '' : pair.slice(0, separator);
+    const key = separator === -1 ? '' : pair.slice(separator + 1);
+    if (agentId === '' || !/^0x[0-9a-fA-F]{64}$/.test(key)) {
+      // Deliberately does not echo the value: a malformed key is still a secret.
+      throw new Error(`GUARD_AGENT_KEYS entry is not agentId=0x<64 hex>: agent "${agentId}"`);
+    }
+    keys.set(agentId, key as `0x${string}`);
+  }
+  return keys;
 }
