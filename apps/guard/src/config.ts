@@ -16,6 +16,32 @@ export const guardConfigSchema = z.object({
   GUARD_OPERATOR_TOKEN: z.string().min(16).optional(),
   /** agentId=wallet pairs, comma separated. Guard fills are attributed to these. */
   GUARD_AGENT_WALLETS: z.string().default(''),
+
+  /** replay forwards to the fixture adapter and reaches no network. */
+  KALIBRA_MODE: z.enum(['replay', 'live']).default('replay'),
+  /** Required in live mode. No default: replay must never silently reach a network. */
+  DREAMDEX_INDEXER_URL: z.url().optional(),
+
+  /**
+   * The signing key Guard places orders with, and the reason Guard is a risk envelope
+   * rather than a polite API.
+   *
+   * RISK_POLICY_SPEC.md section 1 says an agent cannot reach the venue except through
+   * Guard. Nothing in the policy engine makes that true — what makes it true is that this
+   * key lives in Guard's process and the agent never holds one. An agent with its own key
+   * bypasses every rule here by calling the venue directly.
+   *
+   * Absent, Guard runs read-only: orders are evaluated and logged but the adapter refuses
+   * to write. That is the honest degradation, not a silent no-op.
+   */
+  GUARD_SIGNER_KEY: z
+    .string()
+    .regex(/^0x[0-9a-fA-F]{64}$/, 'expected a 0x-prefixed 32-byte hex private key')
+    .optional(),
+  /** Override for the chain WebSocket. The SDK's Shannon definition carries one already. */
+  SOMNIA_WS_RPC_URL: z.string().optional(),
+  /** How long a resting order survives, in ms — the dead-man's switch for a crashed agent. */
+  GUARD_ORDER_TTL_MS: z.coerce.number().int().min(1000).max(3_600_000).default(120_000),
 });
 
 export type GuardConfig = z.infer<typeof guardConfigSchema>;

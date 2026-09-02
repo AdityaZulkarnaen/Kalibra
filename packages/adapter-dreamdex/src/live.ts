@@ -1,11 +1,6 @@
 import { z } from 'zod';
 
-import {
-  MalformedPayloadError,
-  UnsupportedOperationError,
-  type DreamDexAdapter,
-  type StreamOpts,
-} from './adapter.js';
+import { MalformedPayloadError, type DreamDexAdapter, type StreamOpts } from './adapter.js';
 import { reconstructBook, type RestingOrder, type VenueSide } from './book.js';
 import type {
   CanonicalMarket,
@@ -27,6 +22,7 @@ import {
   type VenueMarket,
   type VenueOrder,
 } from './venue.js';
+import { noSignerError, type SomniaWriter } from './writer.js';
 
 /**
  * The live half of the airlock. Reads the venue's GraphQL indexer and emits canonical
@@ -49,10 +45,19 @@ export interface LiveAdapterConfig {
   readonly fetch?: FetchLike;
   /** Cap on markets read in one pass. */
   readonly marketLimit?: number;
+  /**
+   * Supplied only when this adapter is allowed to write. Absent, `placeOrder` throws, which
+   * keeps live ingestion runnable with no credential at all — the venue's read surface is
+   * permissionless (U20) and nothing about reading it should require a funded wallet.
+   */
+  readonly writer?: SomniaWriter;
 }
 
 export class LiveAdapter implements DreamDexAdapter {
-  private readonly config: Required<Omit<LiveAdapterConfig, 'fetch'>> & { fetch: FetchLike };
+  private readonly config: Required<Omit<LiveAdapterConfig, 'fetch' | 'writer'>> & {
+    fetch: FetchLike;
+  };
+  private readonly writer: SomniaWriter | undefined;
 
   constructor(config: LiveAdapterConfig) {
     this.config = {
@@ -60,6 +65,7 @@ export class LiveAdapter implements DreamDexAdapter {
       fetch: config.fetch ?? ((url, init) => globalThis.fetch(url, init)),
       marketLimit: config.marketLimit ?? 200,
     };
+    this.writer = config.writer;
   }
 
   async listMarkets(): Promise<CanonicalMarket[]> {
@@ -129,10 +135,8 @@ export class LiveAdapter implements DreamDexAdapter {
   }
 
   placeOrder(order: CanonicalOrder): Promise<CanonicalOrderResult> {
-    throw new UnsupportedOperationError(
-      `placeOrder(${order.clientOrderId})`,
-      'LiveAdapter is read-only: writing needs a funded signer, which Guard supplies on day 7',
-    );
+    if (this.writer === undefined) throw noSignerError(order.clientOrderId);
+    return this.writer.placeOrder(order);
   }
 
   private async query<T>(body: string, schema: z.ZodType<T>, label: string): Promise<T> {

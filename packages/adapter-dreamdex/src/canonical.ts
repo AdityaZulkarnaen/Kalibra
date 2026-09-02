@@ -94,8 +94,19 @@ export const canonicalOrderSchema = z.object({
   marketId: z.string().min(1),
   side: sideSchema,
   stake: z.bigint().positive(),
+  /**
+   * P(UP), like every other probability here — never the price of the order's own side.
+   * The venue quotes one book in UP terms and a DOWN price is its complement, so carrying
+   * two conventions would put an inversion outside the one place section 4.1 allows it.
+   */
   limitProb: probability.nullable(),
   clientOrderId: z.string().min(1),
+  /**
+   * Rest rather than take: the order refuses to cross and is rejected if it would. Absent
+   * means take. It rides on the order because it is part of what the agent asked for, so
+   * it belongs in the audit entry alongside the rest of the request.
+   */
+  postOnly: z.boolean().optional(),
 });
 
 export const canonicalOrderResultSchema = z.object({

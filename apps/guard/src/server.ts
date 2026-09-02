@@ -23,6 +23,7 @@ const orderSchema = z.object({
     .transform(BigInt),
   limitProb: z.number().nullable(),
   clientOrderId: z.string(),
+  postOnly: z.boolean().optional(),
 });
 
 const submitSchema = z.object({

@@ -49,8 +49,11 @@ export interface GuardOrder {
   readonly marketId: string;
   readonly side: Side;
   readonly stake: bigint;
+  /** P(UP), never the price of the order's own side. */
   readonly limitProb: number | null;
   readonly clientOrderId: string;
+  /** Rest rather than take. Forwarded untouched; Guard has no opinion on it. */
+  readonly postOnly?: boolean | undefined;
 }
 
 /** What the transport resolved about the market named by the order. */

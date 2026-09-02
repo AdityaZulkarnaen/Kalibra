@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 
-import { ReplayAdapter } from '@kalibra/adapter-dreamdex';
 import { openDatabase } from '@kalibra/db';
 
+import { resolveAdapter } from './adapter.js';
 import { guardConfigSchema, parseAgentWallets } from './config.js';
 import { Guard } from './guard.js';
 import { parsePolicy } from './policy-file.js';
@@ -15,7 +15,7 @@ import { buildGuardServer } from './server.js';
 const config = guardConfigSchema.parse(process.env);
 const policy = parsePolicy(JSON.parse(readFileSync(config.GUARD_POLICY_PATH, 'utf8')));
 const { db } = openDatabase(config.KALIBRA_DB_PATH);
-const adapter = await ReplayAdapter.fromDirectory('./fixtures/synthetic');
+const { adapter, description } = await resolveAdapter(config);
 
 const guard = new Guard({
   db,
@@ -35,6 +35,7 @@ console.log(`kalibra guard on http://127.0.0.1:${config.GUARD_PORT}/guard`);
 console.log(
   `policy ${policy.policyId} v${policy.version}, ${policy.allowedMarkets.length} markets allowed`,
 );
+console.log(`venue  ${description}`);
 if (config.GUARD_OPERATOR_TOKEN === undefined) {
   console.log('operator routes are not registered: GUARD_OPERATOR_TOKEN is unset');
 }

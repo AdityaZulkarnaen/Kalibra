@@ -7,3 +7,4 @@ export * from './venue.js';
 export * from './attest.js';
 export * from './attest-chain.js';
 export * from './somnia.js';
+export * from './writer.js';
