@@ -16,13 +16,13 @@
     "demo": "tsx scripts/demo.ts",
     "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm demo",
     "generate-fixtures": "tsx scripts/generate-fixtures.ts",
-    "ingest": "tsx apps/indexer/src/index.ts",
-    "api": "tsx apps/api/src/index.ts",
-    "record": "tsx scripts/record.ts",
+    "ingest": "tsx --env-file-if-exists=.env apps/indexer/src/index.ts",
+    "api": "tsx --env-file-if-exists=.env apps/api/src/index.ts",
+    "record": "tsx --env-file-if-exists=.env scripts/record.ts",
     "web": "pnpm --filter @kalibra/web dev",
     "web:build": "pnpm --filter @kalibra/web build",
-    "guard": "tsx apps/guard/src/index.ts",
-    "verify-attribution": "tsx scripts/verify-attribution.ts"
+    "guard": "tsx --env-file-if-exists=.env apps/guard/src/index.ts",
+    "verify-attribution": "tsx --env-file-if-exists=.env scripts/verify-attribution.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
