@@ -75,13 +75,21 @@ export function parseAgentKeys(raw: string): Map<string, `0x${string}`> {
   for (const pair of raw.split(',').map((part) => part.trim())) {
     if (pair === '') continue;
     const separator = pair.indexOf('=');
-    const agentId = separator === -1 ? '' : pair.slice(0, separator);
-    const key = separator === -1 ? '' : pair.slice(separator + 1);
-    if (agentId === '' || !/^0x[0-9a-fA-F]{64}$/.test(key)) {
+    const agentId = separator === -1 ? '' : pair.slice(0, separator).trim();
+    const key = separator === -1 ? '' : pair.slice(separator + 1).trim();
+    // The 0x prefix is optional because wallets disagree about it — MetaMask exports 64 bare
+    // hex characters, viem requires the prefix. Both spellings mean one key and there is no
+    // third reading, so this canonicalises rather than guesses, the same way section 4.3
+    // canonicalises an address. Anything that is not 64 hex characters is still rejected.
+    const body = key.startsWith('0x') || key.startsWith('0X') ? key.slice(2) : key;
+    if (agentId === '' || !/^[0-9a-fA-F]{64}$/.test(body)) {
       // Deliberately does not echo the value: a malformed key is still a secret.
-      throw new Error(`GUARD_AGENT_KEYS entry is not agentId=0x<64 hex>: agent "${agentId}"`);
+      throw new Error(
+        `GUARD_AGENT_KEYS entry for agent "${agentId}" is not 64 hex characters, ` +
+          `with or without a 0x prefix`,
+      );
     }
-    keys.set(agentId, key as `0x${string}`);
+    keys.set(agentId, `0x${body.toLowerCase()}`);
   }
   return keys;
 }

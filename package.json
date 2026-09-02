@@ -22,7 +22,9 @@
     "web": "pnpm --filter @kalibra/web dev",
     "web:build": "pnpm --filter @kalibra/web build",
     "guard": "tsx --env-file-if-exists=.env apps/guard/src/index.ts",
-    "verify-attribution": "tsx --env-file-if-exists=.env scripts/verify-attribution.ts"
+    "verify-attribution": "tsx --env-file-if-exists=.env scripts/verify-attribution.ts",
+    "agent-funding": "tsx --env-file-if-exists=.env scripts/agent-funding.ts",
+    "place-one": "tsx --env-file-if-exists=.env scripts/place-one.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

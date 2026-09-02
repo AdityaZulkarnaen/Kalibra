@@ -9,3 +9,5 @@ export * from './attest-chain.js';
 export * from './somnia.js';
 export * from './writer.js';
 export * from './keys.js';
+export * from './funding.js';
+export * from './touch.js';

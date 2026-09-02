@@ -89,18 +89,53 @@ run on generated data.
 | Aggregation (`packages/core/src/aggregate.ts`) | SYNTHETIC | Stake-weighted price, netting and all five exclusion reasons, asserted against `docs/SCORING_SPEC.md` §4. Output is invariant to the order trades arrive in. |
 | Canonical types and Zod schemas (`packages/adapter-dreamdex`) | SYNTHETIC | Every fixture is parsed by the same schemas a live payload would meet; a checksummed address, an out-of-range probability or a float stake is rejected rather than coerced. The mapping to real venue fields is verified against captured payloads — `docs/DREAMDEX_ADAPTER.md` §6, where the side and settlement rows are additionally traced end to end in §6.1. |
 | `ReplayAdapter` | SYNTHETIC | Streams the 60 markets, 2,386 trades and 60 settlements in `fixtures/synthetic/`. Deliberately **not** labelled REPLAY: that data is generated, not recorded. |
-| `LiveAdapter` | **LIVE** | Reads the Shannon testnet indexer and has ingested real trades: 6 markets, 14 fills, 10 distinct wallets. Evidence in [`fixtures/recorded/dreamdex-testnet-2026-09-01/`](fixtures/recorded/) and transaction hash `0xe3299c8843bebddb104aae2b3ae0a10c5c37f7cfc379cc9fd47050162cf7e842`. Read-only: writing needs a funded signer, which is day 7. |
+| `LiveAdapter` reads | **LIVE** | Reads the Shannon testnet indexer. A live ingest on 2 Sep pulled 10 markets, 56 fills and 16 distinct wallets, every market an Event Contract — see below. Evidence in [`fixtures/recorded/dreamdex-testnet-2026-09-01/`](fixtures/recorded/). |
+| `LiveAdapter` writes (`placeOrder`) | **LIVE** | One real order, signed by the `mid-anchored` agent wallet and accepted by the pool: [`0x76a5cd91…`](https://shannon-explorer.somnia.network/tx/0x76a5cd914e10ee54f19e31cea8efd6e950bc2bac3fd372215c39d6605e4996c0), block 477687098, status success, venue order id `147573952589676548652`. Sent by `pnpm place-one`. |
 | Persistence (`packages/db`) | SYNTHETIC | Schema extracted verbatim from `docs/API_SPEC.md` §1 into plain SQL and applied to SQLite; a test asserts the Drizzle mirror names exactly the columns the SQL creates. |
 | Ingestion and scoring pipeline (`apps/indexer`) | SYNTHETIC | Ingests every fixture, aggregates 1,112 positions, scores 861 of them, and writes 25 score rows with 250 calibration bins. A second run changes nothing. |
 | Public read API (`apps/api`) | SYNTHETIC | Every endpoint in `docs/API_SPEC.md` §2, with responses parsed by their published Zod schema before they are sent in test mode. The example payloads in that document are parsed by the same schemas, so the spec and the server cannot drift apart without a test failing. |
 | Web app (`apps/web`) | SYNTHETIC | Leaderboard and `/w/:address` profile, rendered per request from `apps/api` with no hardcoded, cached or fallback data — verified by killing the API and confirming the page shows an error rather than numbers. The data it displays is the synthetic fixture set. |
 | Guard policy engine (`packages/core/src/policy.ts`) | SYNTHETIC | All eleven reason codes from `docs/RISK_POLICY_SPEC.md` §4, one test each asserting that code and no other, plus the rule ordering: a killed agent over its daily loss sees `KILL_SWITCH_ACTIVE`. Pure — the clock is an argument. |
 | Guard audit chain (`packages/core/src/audit.ts`) | SYNTHETIC | Keccak-256 over canonical JSON. Verified in both directions: a clean log passes, and insertion, deletion, reordering and a single rewritten field each fail at the right index. Demonstrated against a live SQLite log, below. |
-| Guard transport (`apps/guard`) | SYNTHETIC | HTTP surface, orders forwarded through the adapter, fills written to `trades` with `source = 'GUARD'`. Runs against `ReplayAdapter`; no order has been sent to a real venue, which needs a funded signer on day 7. |
+| Guard transport (`apps/guard`) | SYNTHETIC | HTTP surface, orders forwarded through the adapter, fills written to `trades` with `source = 'GUARD'`. Guard now holds a signing key per agent and can reach the live venue, but **no order has yet been placed through Guard itself** — the one real order above went direct, to prove the write path before three agents depended on it. This row changes when a Guard-forwarded order lands. |
 | `pnpm demo` | SYNTHETIC | Runs the whole pipeline offline into an in-memory database and asserts the result byte-for-byte against `fixtures/expected/demo-output.json`. |
 
 Arena does not exist yet, so it is not listed — there is nothing to claim about it. Rows
 are added as components land.
+
+### These are Event Contracts, not spot
+
+Worth stating outright, because the whole hackathon is about Event Contracts and "we ingested
+some markets" does not say which kind. Every market the live ingest pulls in is an Event
+Contract, and three independent fields say so: `marketType: "BINARY"`, an `oracleQuestionId`
+naming the question it resolves against, and a distinct `yesTokenId`/`noTokenId` pair on the
+shared ERC-6909 outcome-token singleton. A spot market carries none of the three.
+
+Checked on all ten markets of a live ingest on 2 Sep, with the raw response committed at
+[`fixtures/recorded/attribution-2026-09-02/ingested-market-types.json`](fixtures/recorded/attribution-2026-09-02/).
+The venue's own documentation is independently explicit that its HTTP API covers spot only
+and has no event-contract endpoints; this repository never calls it.
+
+### Side attribution is traced to the money, not just mapped
+
+The dangerous failure in a system like this is an inverted UP/DOWN mapping: every score flips,
+nothing throws, and no number looks wrong. Checking the stored side against the venue's own
+`winningOutcome` would be circular, so `pnpm verify-attribution` reconciles four sources that
+do not depend on each other, across two markets that settled in **opposite** directions —
+because a symmetric inversion passes a one-direction check perfectly.
+
+| | `0x…00ff46` | `0x…010e48` |
+|---|---|---|
+| Oracle, open → close | 7787732 → 7795872 = **UP** | 7763542 → 7758409 = **DOWN** |
+| Payout vector | `[10000000, 0]` pays index **0** | `[0, 10000000]` pays index **1** |
+| Chain `winningOutcome` | **0** | **1** |
+| What Kalibra stored | **UP** | **DOWN** |
+
+The layer that closes the loop is an on-chain ERC-6909 balance, and one wallet is the control:
+`0x93e300…` appears in both markets on opposite sides and holds the matching outcome token each
+time. A wallet that has redeemed holds nothing, and that is reported as unobserved rather than
+counted as a pass. Full trace in
+[`fixtures/recorded/attribution-2026-09-02/`](fixtures/recorded/attribution-2026-09-02/).
 
 ### What "LIVE" means here, and what it does not
 
