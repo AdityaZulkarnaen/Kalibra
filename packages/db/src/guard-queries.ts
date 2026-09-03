@@ -32,12 +32,22 @@ const bigintString = z
   .transform(BigInt);
 const side = z.enum(['UP', 'DOWN']);
 
+/**
+ * Every field the order carried when it was hashed has to survive the round trip, because
+ * the digest was taken over all of them. Zod strips what it does not name, so a field added
+ * to `GuardOrder` and forgotten here does not fail loudly — it silently drops out of the
+ * recomputed hash and the whole chain reads as tampered with from entry one.
+ *
+ * That happened when `postOnly` was added: 201 real entries verified as broken while every
+ * byte on disk was intact. If another field joins `GuardOrder`, it belongs here too.
+ */
 const orderSchema = z.object({
   marketId: z.string(),
   side,
   stake: bigintString,
   limitProb: z.number().nullable(),
   clientOrderId: z.string(),
+  postOnly: z.boolean().optional(),
 });
 
 const decisionSchema = z.union([
