@@ -15,19 +15,14 @@ import {
   appendAuditEntry,
   lastAuditEntry,
   readAuditLog,
+  readGuardLedger,
   readGuardMarkets,
   type KalibraDatabase,
 } from '@kalibra/db';
 
 import { recordFill } from './fill.js';
-import {
-  deriveState,
-  emptyLedger,
-  type AgentLedger,
-  type ForwardedOrder,
-  type MarketFacts,
-} from './ledger.js';
-import { withKillSwitch } from './policy-file.js';
+import { deriveState, type AgentLedger, type ForwardedOrder, type MarketFacts } from './ledger.js';
+import { withAllowedMarkets, withKillSwitch } from './policy-file.js';
 
 /**
  * Guard. `RISK_POLICY_SPEC.md`, all of it.
@@ -105,6 +100,20 @@ export class Guard {
         this.ledgers.set(agentId, { ...ledger, killSwitchTrippedAt: now });
       }
     }
+    return this.policy;
+  }
+
+  /**
+   * The operator's other lever: which markets an agent may touch.
+   *
+   * Deliberately narrower than "set the policy". A supervisor has to rotate this every few
+   * minutes, because Event Contract windows roll and yesterday's market id is gone; giving
+   * that loop the power to rewrite every limit would mean the risk envelope was set by
+   * automation rather than by a human, which is the opposite of what Guard is for. Limits
+   * are changed by editing guard.policy.json and restarting.
+   */
+  setAllowedMarkets(markets: readonly string[]): GuardPolicy {
+    this.policy = withAllowedMarkets(this.policy, markets);
     return this.policy;
   }
 
@@ -258,8 +267,21 @@ export class Guard {
     return this.options.adapterFor?.(agentId) ?? this.options.adapter;
   }
 
+  /**
+   * A cold ledger is rebuilt from disk rather than started empty. Every counter in
+   * `GuardState` is derived from the forwarded list, so an empty one hands a restarted agent
+   * a fresh daily loss, a zero open notional and no loss streak — a limit-breaching agent
+   * would get a clean slate from a crash, and the numbers would look entirely plausible.
+   */
   private ledgerFor(agentId: string): AgentLedger {
-    return this.ledgers.get(agentId) ?? emptyLedger();
+    const known = this.ledgers.get(agentId);
+    if (known !== undefined) return known;
+    const recovered: AgentLedger = {
+      forwarded: readGuardLedger(this.options.db, agentId),
+      killSwitchTrippedAt: null,
+    };
+    this.ledgers.set(agentId, recovered);
+    return recovered;
   }
 
   private remember(agentId: string, forwarded: ForwardedOrder): void {

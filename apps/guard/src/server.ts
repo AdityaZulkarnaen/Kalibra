@@ -117,6 +117,7 @@ function registerOperatorRoutes(
   clock: () => number,
 ): void {
   const killSchema = z.object({ engaged: z.boolean() });
+  const marketsSchema = z.object({ allowedMarkets: z.array(z.string().min(1)) });
 
   app.post('/guard/operator/kill-switch', (request, reply) => {
     if (request.headers.authorization !== `Bearer ${token}`) {
@@ -127,5 +128,25 @@ function registerOperatorRoutes(
       return fail(reply, 400, 'BAD_REQUEST', z.prettifyError(parsed.error));
     }
     return send(reply, 200, guard.setKillSwitch(parsed.data.engaged, clock()));
+  });
+
+  /**
+   * Rotates the allowlist. Event Contract windows roll every few minutes and their ids go
+   * with them, so a static allowlist denies everything within the hour — but the answer is
+   * not to weaken deny-by-default, it is to let the operator's own supervisor keep the list
+   * current. The route carries the operator token; no agent and no MCP tool reaches it.
+   *
+   * It changes the allowlist and nothing else. A route that could set the whole policy
+   * would let a loop widen every limit it was written to respect.
+   */
+  app.post('/guard/operator/allowed-markets', (request, reply) => {
+    if (request.headers.authorization !== `Bearer ${token}`) {
+      return fail(reply, 401, 'BAD_REQUEST', 'operator token required');
+    }
+    const parsed = marketsSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return fail(reply, 400, 'BAD_REQUEST', z.prettifyError(parsed.error));
+    }
+    return send(reply, 200, guard.setAllowedMarkets(parsed.data.allowedMarkets));
   });
 }

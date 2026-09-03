@@ -181,6 +181,75 @@ describe('the operator surface is not reachable by an agent', () => {
     expect(response.json().decision.reason).toBe('KILL_SWITCH_ACTIVE');
   });
 
+  it('is not registered without a token, like the kill switch', async () => {
+    const app = build(undefined);
+    const response = await app.inject({
+      method: 'POST',
+      url: '/guard/operator/allowed-markets',
+      payload: { allowedMarkets: [] },
+    });
+    expect(response.statusCode).toBe(404);
+  });
+
+  it('refuses an allowlist change without the token', async () => {
+    const app = build(TOKEN);
+    const response = await app.inject({
+      method: 'POST',
+      url: '/guard/operator/allowed-markets',
+      payload: { allowedMarkets: ['0xdeadbeef'] },
+    });
+    // An agent that finds the port must not be able to permit itself a market.
+    expect(response.statusCode).toBe(401);
+  });
+
+  it('rotates the allowlist for the operator, and the next order sees it', async () => {
+    const app = build(TOKEN);
+    // Event Contract windows roll every few minutes and take their ids with them, so the
+    // supervisor rewrites this list rather than the policy being edited by hand each time.
+    const rotated = await app.inject({
+      method: 'POST',
+      url: '/guard/operator/allowed-markets',
+      headers: { authorization: `Bearer ${TOKEN}` },
+      payload: { allowedMarkets: ['0xsome-other-window'] },
+    });
+    expect(rotated.statusCode).toBe(200);
+    expect(rotated.json().allowedMarkets).toEqual(['0xsome-other-window']);
+
+    const response = await submit(app);
+    expect(response.json().decision.reason).toBe('MARKET_NOT_ALLOWED');
+  });
+
+  it('bumps the policy version on a rotation, so the audit log records which list applied', async () => {
+    const app = build(TOKEN);
+    const before = (await app.inject({ method: 'GET', url: '/guard/policy' })).json().version;
+    await app.inject({
+      method: 'POST',
+      url: '/guard/operator/allowed-markets',
+      headers: { authorization: `Bearer ${TOKEN}` },
+      payload: { allowedMarkets: [] },
+    });
+    const after = (await app.inject({ method: 'GET', url: '/guard/policy' })).json().version;
+    expect(after).toBe(before + 1);
+  });
+
+  it('changes the allowlist and nothing else', async () => {
+    const app = build(TOKEN);
+    const before = (await app.inject({ method: 'GET', url: '/guard/policy' })).json();
+    await app.inject({
+      method: 'POST',
+      url: '/guard/operator/allowed-markets',
+      headers: { authorization: `Bearer ${TOKEN}` },
+      // A limit smuggled into the body must not take effect: the route exists so a loop can
+      // keep a rolling allowlist current, not so it can widen the envelope it runs inside.
+      payload: { allowedMarkets: [], maxNotionalPerOrder: '999999999999', killSwitch: false },
+    });
+    const after = (await app.inject({ method: 'GET', url: '/guard/policy' })).json();
+    expect(after.maxNotionalPerOrder).toBe(before.maxNotionalPerOrder);
+    expect(after.maxOpenNotional).toBe(before.maxOpenNotional);
+    expect(after.maxDailyLoss).toBe(before.maxDailyLoss);
+    expect(after.allowedMarkets).toEqual([]);
+  });
+
   it('exposes no route that widens a limit', async () => {
     const app = build(TOKEN);
     const routes = app.printRoutes();

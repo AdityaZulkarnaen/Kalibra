@@ -5,11 +5,11 @@ import {
   type GuardOrder,
   type GuardState,
 } from '@kalibra/core';
-import { asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, like } from 'drizzle-orm';
 import { z } from 'zod';
 
 import type { KalibraDatabase } from './migrate.js';
-import { auditLog, markets } from './schema.js';
+import { auditLog, markets, trades } from './schema.js';
 
 /**
  * Guard's audit log, on disk. `API_SPEC.md` §1 defines the table; `RISK_POLICY_SPEC.md` §6
@@ -155,6 +155,58 @@ export function readGuardMarkets(db: KalibraDatabase, marketIds: readonly string
     rows.map((row) => {
       const parsed = guardMarketSchema.parse(row);
       return [parsed.marketId, parsed];
+    }),
+  );
+}
+
+/** One order Guard forwarded, as it can be recovered after a restart. */
+export const guardForwardedSchema = z.object({
+  clientOrderId: z.string().min(1),
+  marketId: z.string().min(1),
+  side: z.enum(['UP', 'DOWN']),
+  stake: z.string().regex(/^\d+$/).transform(BigInt),
+  impliedProbUp: z.number(),
+  at: z.number().int(),
+});
+
+export type GuardForwardedRow = z.infer<typeof guardForwardedSchema>;
+
+/**
+ * Rebuilds an agent's forwarded orders from the trades Guard itself wrote.
+ *
+ * Guard derives every counter in `GuardState` from this list rather than storing them, so
+ * losing it means an agent's open notional, daily loss and loss streak all silently reset to
+ * zero. A restart would hand a limit-breaching agent a clean slate, which is the one thing a
+ * risk envelope must not do — and it is invisible, because the numbers look plausible.
+ *
+ * Nothing new is persisted for this. A forwarded order already becomes a row in `trades`
+ * with `source = 'GUARD'` and a `trade_id` of `guard:{agentId}:{clientOrderId}`, so the
+ * ledger was always recoverable; it simply was not being recovered.
+ */
+export function readGuardLedger(db: KalibraDatabase, agentId: string): GuardForwardedRow[] {
+  const prefix = `guard:${agentId}:`;
+  const rows = db
+    .select({
+      tradeId: trades.tradeId,
+      marketId: trades.marketId,
+      side: trades.side,
+      stake: trades.stake,
+      impliedProbUp: trades.impliedProbUp,
+      at: trades.timestamp,
+    })
+    .from(trades)
+    .where(and(eq(trades.source, 'GUARD'), like(trades.tradeId, `${prefix}%`)))
+    .orderBy(trades.timestamp)
+    .all();
+
+  return rows.map((row) =>
+    guardForwardedSchema.parse({
+      clientOrderId: row.tradeId.slice(prefix.length),
+      marketId: row.marketId,
+      side: row.side,
+      stake: row.stake,
+      impliedProbUp: row.impliedProbUp,
+      at: row.at,
     }),
   );
 }
