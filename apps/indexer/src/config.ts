@@ -15,6 +15,18 @@ export const configSchema = z.object({
   DREAMDEX_INDEXER_URL: z.string().url().optional(),
   /** Live mode reads orders per market to reconstruct mids, so this bounds one pass. */
   DREAMDEX_MARKET_LIMIT: z.coerce.number().int().min(1).max(500).default(10),
+  /**
+   * Ingest windows nobody has traded yet. Needed while agents are running: Guard resolves a
+   * market's status and window from this table, so a window missing from it is refused as
+   * MARKET_NOT_OPEN — and the agents could only ever join markets somebody else started,
+   * which on a quiet testnet is most of the day.
+   */
+  DREAMDEX_INCLUDE_UNTRADED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  /** How often `--watch` repeats a pass. Guard reads market facts from this table. */
+  KALIBRA_INGEST_INTERVAL_MS: z.coerce.number().int().min(5000).max(600_000).default(60_000),
 });
 
 export type IndexerConfig = z.infer<typeof configSchema>;

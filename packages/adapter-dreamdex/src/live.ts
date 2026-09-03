@@ -46,6 +46,15 @@ export interface LiveAdapterConfig {
   /** Cap on markets read in one pass. */
   readonly marketLimit?: number;
   /**
+   * Include windows nobody has traded yet.
+   *
+   * Off by default, because ingestion has nothing to read from an empty market and pulling
+   * its order rows costs a round trip to learn that. On for an agent, which needs to know a
+   * window exists *before* it has trades — otherwise it can only ever join markets someone
+   * else started, and on a quiet testnet that is most of the day.
+   */
+  readonly includeUntraded?: boolean;
+  /**
    * Supplied only when this adapter is allowed to write. Absent, `placeOrder` throws, which
    * keeps live ingestion runnable with no credential at all — the venue's read surface is
    * permissionless (U20) and nothing about reading it should require a funded wallet.
@@ -64,6 +73,7 @@ export class LiveAdapter implements DreamDexAdapter {
       indexerUrl: config.indexerUrl,
       fetch: config.fetch ?? ((url, init) => globalThis.fetch(url, init)),
       marketLimit: config.marketLimit ?? 200,
+      includeUntraded: config.includeUntraded ?? false,
     };
     this.writer = config.writer;
   }
@@ -157,12 +167,20 @@ export class LiveAdapter implements DreamDexAdapter {
 
   private async fetchMarkets(): Promise<VenueMarket[]> {
     const result = await this.query(
-      // Markets that have actually traded, most recently active first. A freshly listed
-      // window has nothing to ingest, and pulling its order rows would cost a round trip
-      // to learn that.
-      `{ Market(where: {marketType: {_eq: "BINARY"}, tradeCount: {_gt: 0}},
-         limit: ${this.config.marketLimit}, order_by: {lastTradeAt: desc})
-         { ${MARKET_FIELDS} } }`,
+      // Two different questions, so two different orderings.
+      //
+      // Ingestion wants markets that have traded, most recently first: an untraded market has
+      // nothing to read and pulling its order rows costs a round trip to learn that.
+      //
+      // Discovery wants the windows still open, so it sorts by expiry — a market nobody has
+      // traded has no `lastTradeAt` at all, and sorting on it returns the oldest dead windows
+      // rather than the live ones, which is exactly what an agent must not be handed.
+      this.config.includeUntraded
+        ? `{ Market(where: {marketType: {_eq: "BINARY"}}, limit: ${this.config.marketLimit},
+             order_by: {expiry: desc}) { ${MARKET_FIELDS} } }`
+        : `{ Market(where: {marketType: {_eq: "BINARY"}, tradeCount: {_gt: 0}},
+             limit: ${this.config.marketLimit}, order_by: {lastTradeAt: desc})
+             { ${MARKET_FIELDS} } }`,
       marketsResponse,
       'Market',
     );
