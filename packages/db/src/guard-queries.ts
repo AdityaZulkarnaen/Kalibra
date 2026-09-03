@@ -5,11 +5,11 @@ import {
   type GuardOrder,
   type GuardState,
 } from '@kalibra/core';
-import { and, asc, desc, eq, inArray, like } from 'drizzle-orm';
+import { asc, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 
 import type { KalibraDatabase } from './migrate.js';
-import { auditLog, markets, trades } from './schema.js';
+import { auditLog, markets } from './schema.js';
 
 /**
  * Guard's audit log, on disk. `API_SPEC.md` §1 defines the table; `RISK_POLICY_SPEC.md` §6
@@ -160,53 +160,53 @@ export function readGuardMarkets(db: KalibraDatabase, marketIds: readonly string
 }
 
 /** One order Guard forwarded, as it can be recovered after a restart. */
-export const guardForwardedSchema = z.object({
-  clientOrderId: z.string().min(1),
-  marketId: z.string().min(1),
-  side: z.enum(['UP', 'DOWN']),
-  stake: z.string().regex(/^\d+$/).transform(BigInt),
-  impliedProbUp: z.number(),
-  at: z.number().int(),
-});
-
-export type GuardForwardedRow = z.infer<typeof guardForwardedSchema>;
+export interface GuardForwardedRow {
+  readonly clientOrderId: string;
+  readonly marketId: string;
+  readonly side: 'UP' | 'DOWN';
+  readonly stake: bigint;
+  readonly impliedProbUp: number;
+  readonly at: number;
+}
 
 /**
- * Rebuilds an agent's forwarded orders from the trades Guard itself wrote.
+ * Rebuilds an agent's forwarded orders from Guard's own audit log.
  *
- * Guard derives every counter in `GuardState` from this list rather than storing them, so
- * losing it means an agent's open notional, daily loss and loss streak all silently reset to
- * zero. A restart would hand a limit-breaching agent a clean slate, which is the one thing a
- * risk envelope must not do — and it is invisible, because the numbers look plausible.
+ * The audit log is the right source and `trades` is not. A GUARD row in `trades` records
+ * what an agent *asked for*; against a real venue the tape separately records what actually
+ * *filled*, and the two are different numbers for the same position — a partial fill of an
+ * order makes them differ by most of the size. Deriving risk from the audit log and scoring
+ * from the tape keeps each question answered by the source that knows it.
  *
- * Nothing new is persisted for this. A forwarded order already becomes a row in `trades`
- * with `source = 'GUARD'` and a `trade_id` of `guard:{agentId}:{clientOrderId}`, so the
- * ledger was always recoverable; it simply was not being recovered.
+ * Only ALLOW decisions count, and only the last decision for a client order id: an order
+ * allowed and then recorded as UPSTREAM_UNAVAILABLE never reached the venue, so it is no
+ * exposure and must not be counted as any.
+ *
+ * The entry price is the order's own limit. Guard needs a price to mark a position against,
+ * and a buyer never pays more than their limit — so PnL computed at the limit overstates
+ * cost, which errs toward tripping a loss limit early rather than late. That is the
+ * direction a risk control should be wrong in.
  */
 export function readGuardLedger(db: KalibraDatabase, agentId: string): GuardForwardedRow[] {
-  const prefix = `guard:${agentId}:`;
-  const rows = db
-    .select({
-      tradeId: trades.tradeId,
-      marketId: trades.marketId,
-      side: trades.side,
-      stake: trades.stake,
-      impliedProbUp: trades.impliedProbUp,
-      at: trades.timestamp,
-    })
-    .from(trades)
-    .where(and(eq(trades.source, 'GUARD'), like(trades.tradeId, `${prefix}%`)))
-    .orderBy(trades.timestamp)
-    .all();
+  const latest = new Map<string, GuardForwardedRow | null>();
 
-  return rows.map((row) =>
-    guardForwardedSchema.parse({
-      clientOrderId: row.tradeId.slice(prefix.length),
-      marketId: row.marketId,
-      side: row.side,
-      stake: row.stake,
-      impliedProbUp: row.impliedProbUp,
-      at: row.at,
-    }),
-  );
+  for (const entry of readAuditLog(db, agentId)) {
+    const { clientOrderId } = entry.order;
+    if (entry.decision.verdict !== 'ALLOW') {
+      latest.set(clientOrderId, null);
+      continue;
+    }
+    latest.set(clientOrderId, {
+      clientOrderId,
+      marketId: entry.order.marketId,
+      side: entry.order.side,
+      stake: entry.order.stake,
+      // A market order carries no limit; 0.5 is the neutral mark, and it is only ever a
+      // marking price for a risk counter, never a number that reaches a score.
+      impliedProbUp: entry.order.limitProb ?? 0.5,
+      at: entry.timestamp,
+    });
+  }
+
+  return [...latest.values()].filter((row): row is GuardForwardedRow => row !== null);
 }

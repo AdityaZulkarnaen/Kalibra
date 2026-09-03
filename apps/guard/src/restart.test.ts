@@ -6,6 +6,7 @@ import {
   AGENT,
   AGENT_WALLET,
   acceptingAdapter,
+  guardTradeCount,
   orderFor,
   policyFor,
   setUpHarness,
@@ -92,5 +93,81 @@ describe('Guard after a restart', () => {
 
     const after = build();
     expect((await after.riskStatus('someone-else', harness.now)).state.openNotional).toBe(0n);
+  });
+});
+
+/**
+ * The corruption this guards against was found in live data, not in a test.
+ *
+ * Guard wrote every forwarded order into `trades` so it could be scored. Against a replay
+ * adapter that is the only record there is. Against a real venue it is not: the tape already
+ * carries what actually filled, and the indexer ingests it under the same wallet and market.
+ * Aggregation nets one wallet's rows per market, so the order the agent asked for and the
+ * fill it got became a single position of roughly twice the size — with every number still
+ * looking entirely reasonable.
+ */
+describe('Guard against a venue that keeps its own tape', () => {
+  it('writes no trade of its own, leaving the fill to the tape', async () => {
+    const guard = new Guard({
+      db: harness.opened.db,
+      adapter: acceptingAdapter(harness.replay),
+      policy: policyFor(harness),
+      wallets: new Map([[AGENT, AGENT_WALLET]]),
+      recordFills: false,
+    });
+
+    const result = await guard.submit(AGENT, order('a', 10_000_000n), harness.now);
+    expect(result.decision.verdict).toBe('ALLOW');
+    expect(result.forwarded).toBe(true);
+    expect(result.recorded).toBe(false);
+    expect(guardTradeCount(harness.opened)).toBe(0);
+  });
+
+  it('still counts the exposure, because risk comes from the audit log', async () => {
+    const guard = new Guard({
+      db: harness.opened.db,
+      adapter: acceptingAdapter(harness.replay),
+      policy: policyFor(harness),
+      wallets: new Map([[AGENT, AGENT_WALLET]]),
+      recordFills: false,
+    });
+
+    await guard.submit(AGENT, order('a', 30_000_000n), harness.now);
+    // Not writing a trade must not mean forgetting the position: the two concerns are
+    // separate sources, and only the scoring one moved.
+    expect((await guard.riskStatus(AGENT, harness.now)).state.openNotional).toBe(30_000_000n);
+  });
+
+  it('still writes the trade when the venue has no tape, or the position would not exist', async () => {
+    const guard = new Guard({
+      db: harness.opened.db,
+      adapter: acceptingAdapter(harness.replay),
+      policy: policyFor(harness),
+      wallets: new Map([[AGENT, AGENT_WALLET]]),
+      recordFills: true,
+    });
+
+    await guard.submit(AGENT, order('a', 10_000_000n), harness.now);
+    expect(guardTradeCount(harness.opened)).toBe(1);
+  });
+
+  it('does not count an order the venue never received', async () => {
+    const unreachable = {
+      ...acceptingAdapter(harness.replay),
+      placeOrder: () => Promise.reject(new Error('socket closed')),
+    };
+    const guard = new Guard({
+      db: harness.opened.db,
+      adapter: unreachable,
+      policy: policyFor(harness),
+      wallets: new Map([[AGENT, AGENT_WALLET]]),
+      recordFills: false,
+    });
+
+    const result = await guard.submit(AGENT, order('a', 30_000_000n), harness.now);
+    expect(result.decision.verdict).toBe('DENY');
+    // The order was allowed and then failed to send. It is no exposure, and the ledger has
+    // to read the last word on a client order id rather than the first.
+    expect((await guard.riskStatus(AGENT, harness.now)).state.openNotional).toBe(0n);
   });
 });

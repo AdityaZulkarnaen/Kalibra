@@ -21,7 +21,7 @@ import {
 } from '@kalibra/db';
 
 import { recordFill } from './fill.js';
-import { deriveState, type AgentLedger, type ForwardedOrder, type MarketFacts } from './ledger.js';
+import { deriveState, type AgentLedger, type MarketFacts } from './ledger.js';
 import { withAllowedMarkets, withKillSwitch } from './policy-file.js';
 
 /**
@@ -46,6 +46,17 @@ export interface GuardOptions {
   readonly policy: GuardPolicy;
   /** agentId to the wallet its fills are attributed to, for Arena scoring. */
   readonly wallets: ReadonlyMap<string, string>;
+  /**
+   * Whether a forwarded order is also written to `trades` for scoring.
+   *
+   * True against a replay adapter, which has no tape of its own, so without this the agent's
+   * positions would not exist at all. **False against a real venue**, where the tape already
+   * records what filled and the indexer ingests it: writing here as well would put the order
+   * the agent asked for and the fill it actually got into the same wallet and market, and
+   * aggregation would net them into one position of roughly twice the size. Both numbers
+   * look reasonable, which is what makes it worth guarding against rather than noticing later.
+   */
+  readonly recordFills?: boolean;
 }
 
 export interface SubmitResult {
@@ -194,16 +205,18 @@ export class Guard {
       };
     }
 
-    const fill = await recordFill({
-      db: this.options.db,
-      adapter: this.options.adapter,
-      agentId,
-      wallet: this.options.wallets.get(agentId),
-      order,
-      txHash: accepted.txHash,
-      now,
-    });
-    if (fill.forwarded !== null) this.remember(agentId, fill.forwarded);
+    const fill =
+      this.options.recordFills === false
+        ? { recorded: false, note: 'scored from the venue tape, not from Guard', forwarded: null }
+        : await recordFill({
+            db: this.options.db,
+            adapter: this.options.adapter,
+            agentId,
+            wallet: this.options.wallets.get(agentId),
+            order,
+            txHash: accepted.txHash,
+            now,
+          });
 
     return {
       decision,
@@ -273,20 +286,18 @@ export class Guard {
    * a fresh daily loss, a zero open notional and no loss streak — a limit-breaching agent
    * would get a clean slate from a crash, and the numbers would look entirely plausible.
    */
+  /**
+   * Derived on every evaluation rather than carried in memory. `ledger.ts` already argues
+   * for this: there is no counter to drift out of step with reality, nothing to forget to
+   * decrement, and a restart reproduces the same state because it reads the same rows. The
+   * only thing held in memory is the kill switch, which is an operator action rather than a
+   * consequence of the orders themselves.
+   */
   private ledgerFor(agentId: string): AgentLedger {
-    const known = this.ledgers.get(agentId);
-    if (known !== undefined) return known;
-    const recovered: AgentLedger = {
+    return {
       forwarded: readGuardLedger(this.options.db, agentId),
-      killSwitchTrippedAt: null,
+      killSwitchTrippedAt: this.ledgers.get(agentId)?.killSwitchTrippedAt ?? null,
     };
-    this.ledgers.set(agentId, recovered);
-    return recovered;
-  }
-
-  private remember(agentId: string, forwarded: ForwardedOrder): void {
-    const ledger = this.ledgerFor(agentId);
-    this.ledgers.set(agentId, { ...ledger, forwarded: [...ledger.forwarded, forwarded] });
   }
 
   private trip(agentId: string, now: number): void {

@@ -29,6 +29,8 @@ export interface ResolvedVenue {
   readonly wallets: ReadonlyMap<string, string>;
   /** Printed at startup, so an operator can see whether this process can spend. */
   readonly description: string;
+  /** False when the venue keeps its own tape, which the indexer ingests instead. */
+  readonly recordFills: boolean;
 }
 
 export async function resolveVenue(config: GuardConfig): Promise<ResolvedVenue> {
@@ -41,6 +43,8 @@ export async function resolveVenue(config: GuardConfig): Promise<ResolvedVenue> 
       adapterFor: () => adapter,
       wallets: declared,
       description: 'replay (committed fixtures, no network, cannot write)',
+      // A replay has no tape of its own, so a forwarded order is the only record there is.
+      recordFills: true,
     };
   }
 
@@ -80,5 +84,8 @@ export async function resolveVenue(config: GuardConfig): Promise<ResolvedVenue> 
       signers.size === 0
         ? 'live, read-only (no GUARD_AGENT_KEYS: orders are evaluated and logged, never sent)'
         : `live, signing for ${signers.size} agent${signers.size === 1 ? '' : 's'}`,
+    // The venue's own tape records what filled. Writing the order here as well would put
+    // intent and fill in the same wallet and market, and aggregation would net them.
+    recordFills: false,
   };
 }

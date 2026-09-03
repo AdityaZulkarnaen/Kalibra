@@ -15,9 +15,9 @@ import { buildGuardServer } from './server.js';
 const config = guardConfigSchema.parse(process.env);
 const policy = parsePolicy(JSON.parse(readFileSync(config.GUARD_POLICY_PATH, 'utf8')));
 const { db } = openDatabase(config.KALIBRA_DB_PATH);
-const { adapter, adapterFor, wallets, description } = await resolveVenue(config);
+const { adapter, adapterFor, wallets, description, recordFills } = await resolveVenue(config);
 
-const guard = new Guard({ db, adapter, adapterFor, policy, wallets });
+const guard = new Guard({ db, adapter, adapterFor, policy, wallets, recordFills });
 
 const app = buildGuardServer({
   guard,
