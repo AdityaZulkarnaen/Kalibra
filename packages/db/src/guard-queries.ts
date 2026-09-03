@@ -5,7 +5,7 @@ import {
   type GuardOrder,
   type GuardState,
 } from '@kalibra/core';
-import { asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 
 import type { KalibraDatabase } from './migrate.js';
@@ -168,6 +168,41 @@ export function readGuardMarkets(db: KalibraDatabase, marketIds: readonly string
     }),
   );
 }
+
+/**
+ * Every market that is open right now, with the underlying it tracks.
+ *
+ * Used to answer "what may this agent trade", which is this list intersected with the
+ * policy allowlist — the intersection happens in Guard, where the policy lives, not here.
+ * The window bound is applied in SQL rather than in the caller so a market whose window has
+ * passed but whose row still says OPEN, because the indexer has not caught up, is not
+ * offered to an agent that would be refused on it.
+ */
+export function readOpenMarkets(db: KalibraDatabase, now: number): OpenMarketRow[] {
+  const rows = db
+    .select({
+      marketId: markets.marketId,
+      underlying: markets.underlying,
+      windowStart: markets.windowStart,
+      windowEnd: markets.windowEnd,
+      status: markets.status,
+    })
+    .from(markets)
+    .where(and(eq(markets.status, 'OPEN'), gt(markets.windowEnd, now)))
+    .orderBy(asc(markets.windowEnd), asc(markets.marketId))
+    .all();
+  return rows.map((row) => openMarketSchema.parse(row));
+}
+
+const openMarketSchema = z.object({
+  marketId: z.string(),
+  underlying: z.string(),
+  windowStart: z.number(),
+  windowEnd: z.number(),
+  status: z.literal('OPEN'),
+});
+
+export type OpenMarketRow = z.infer<typeof openMarketSchema>;
 
 /** One order Guard forwarded, as it can be recovered after a restart. */
 export interface GuardForwardedRow {

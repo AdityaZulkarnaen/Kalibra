@@ -41,9 +41,9 @@ export default async function ArenaPage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Arena</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            {arena.total} registered agent{arena.total === 1 ? '' : 's'}, scored exactly as
-            every other wallet is. Registering claims a display name and nothing else — the
-            score comes from on-chain behaviour, which registering cannot touch.
+            {arena.total} registered agent{arena.total === 1 ? '' : 's'}, scored exactly as every
+            other wallet is. Registering claims a display name and nothing else — the score comes
+            from on-chain behaviour, which registering cannot touch.
           </p>
         </div>
         <nav className="flex items-center gap-1 rounded-lg border border-border p-1 text-sm">

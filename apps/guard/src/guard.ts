@@ -3,6 +3,7 @@ import {
   deny,
   evaluate,
   nextAuditEntry,
+  unrealisedPnl,
   verifyChain,
   type AuditEntry,
   type ChainVerification,
@@ -10,6 +11,7 @@ import {
   type GuardOrder,
   type GuardPolicy,
   type GuardState,
+  type Side,
 } from '@kalibra/core';
 import {
   appendAuditEntry,
@@ -17,6 +19,7 @@ import {
   readAuditLog,
   readGuardLedger,
   readGuardMarkets,
+  readOpenMarkets,
   type KalibraDatabase,
 } from '@kalibra/db';
 
@@ -71,6 +74,40 @@ export interface SubmitResult {
   readonly recorded: boolean;
   /** Why it was not recorded, when it was not. */
   readonly note: string | null;
+}
+
+/** A market this agent may trade right now, and how long it has left. */
+export interface PermittedMarket {
+  readonly marketId: string;
+  readonly underlying: string;
+  readonly windowStart: number;
+  readonly windowEnd: number;
+  readonly closesInMs: number;
+}
+
+/**
+ * A quote as the canonical type carries it, mid included — and a mid can be absent, because
+ * an empty book has no midpoint. An agent that cannot see that would price against a
+ * fabricated 0.5.
+ */
+export interface Quote {
+  readonly marketId: string;
+  readonly bestBidUp: number | null;
+  readonly bestAskUp: number | null;
+  readonly midUp: number | null;
+  readonly lastUp: number | null;
+  readonly at: number;
+}
+
+/** One open exposure, marked at the current mid where one is available. */
+export interface OpenPosition {
+  readonly marketId: string;
+  readonly side: Side;
+  readonly stake: bigint;
+  readonly entryProbUp: number;
+  readonly markProbUp: number | null;
+  readonly unrealisedPnl: bigint;
+  readonly openedAt: number;
 }
 
 export interface RiskStatus {
@@ -165,6 +202,79 @@ export class Guard {
         ordersInWindow: Math.max(0, this.policy.maxOrdersPerWindow - state.ordersInWindow),
       },
     };
+  }
+
+  /**
+   * What this agent may trade, right now.
+   *
+   * Open markets intersected with the policy allowlist, minus the ones inside
+   * `minTimeToCloseMs`. Offering a market that `evaluate` would refuse as
+   * TOO_CLOSE_TO_CLOSE or MARKET_NOT_ALLOWED would spend the agent's turn on a certain
+   * denial, which is the same argument `RISK_POLICY_SPEC.md` §7 makes for exposing
+   * remaining headroom rather than only the limits.
+   */
+  markets(now: number): PermittedMarket[] {
+    const allowed = new Set(this.policy.allowedMarkets);
+    return readOpenMarkets(this.options.db, now)
+      .filter((row) => allowed.has(row.marketId))
+      .filter((row) => row.windowEnd - now > this.policy.minTimeToCloseMs)
+      .map((row) => ({
+        marketId: row.marketId,
+        underlying: row.underlying,
+        windowStart: row.windowStart,
+        windowEnd: row.windowEnd,
+        closesInMs: row.windowEnd - now,
+      }));
+  }
+
+  /**
+   * The venue's current mid for one market, read through the same adapter Guard marks
+   * positions with. It goes through Guard rather than letting the agent hold an adapter of
+   * its own, so that "the agent cannot reach DreamDEX except through Guard" stays true of
+   * reads as well as of orders.
+   */
+  async quote(marketId: string, now: number): Promise<Quote> {
+    const quote = await this.options.adapter.getQuote(marketId, now);
+    return {
+      marketId,
+      bestBidUp: quote.bestBidUp,
+      bestAskUp: quote.bestAskUp,
+      midUp: quote.midUp,
+      lastUp: quote.lastUp,
+      at: quote.timestamp,
+    };
+  }
+
+  /**
+   * The agent's open exposure, derived from the orders Guard forwarded exactly as the risk
+   * counters are. A position leaves this list when its market settles, which is when it
+   * stops consuming open notional.
+   */
+  async positions(agentId: string, now: number): Promise<OpenPosition[]> {
+    const forwarded = readGuardLedger(this.options.db, agentId);
+    const rows = readGuardMarkets(this.options.db, [
+      ...new Set(forwarded.map((row) => row.marketId)),
+    ]);
+
+    const open: OpenPosition[] = [];
+    for (const row of forwarded) {
+      const facts = rows.get(row.marketId);
+      if (facts !== undefined && facts.outcome !== null) continue;
+      const markProbUp = facts === undefined ? null : await this.mark(facts, now);
+      open.push({
+        marketId: row.marketId,
+        side: row.side,
+        stake: row.stake,
+        entryProbUp: row.impliedProbUp,
+        markProbUp,
+        // Marking at cost when there is no quote gives exactly zero, which is what
+        // `unrealisedPnl` documents as the honest degradation. Spelled out rather than
+        // passed through, so the choice is visible here too.
+        unrealisedPnl: markProbUp === null ? 0n : unrealisedPnl(row, markProbUp),
+        openedAt: row.at,
+      });
+    }
+    return open;
   }
 
   async submit(agentId: string, order: GuardOrder, now: number): Promise<SubmitResult> {

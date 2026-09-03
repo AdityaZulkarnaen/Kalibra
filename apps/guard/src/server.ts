@@ -72,6 +72,34 @@ export function buildGuardServer(options: ServerOptions): FastifyInstance {
     return send(reply, 200, await guard.riskStatus(agentId, clock(), marketId));
   });
 
+  /**
+   * The three read routes the MCP surface is built on (`RISK_POLICY_SPEC.md` §7). They are
+   * reads only: none of them can change the policy, and there is deliberately no route
+   * anywhere on this server that lets a caller without the operator token change one.
+   */
+  app.get('/guard/markets', (_request, reply) => send(reply, 200, guard.markets(clock())));
+
+  app.get('/guard/quote/:marketId', async (request, reply) => {
+    const { marketId } = request.params as { marketId: string };
+    try {
+      return send(reply, 200, await guard.quote(marketId, clock()));
+    } catch (cause) {
+      // The venue could not price it. That is not a 500 on Guard's part, and an agent
+      // needs to tell "no quote" apart from "Guard is broken".
+      return fail(
+        reply,
+        502,
+        'UPSTREAM_UNAVAILABLE',
+        cause instanceof Error ? cause.message : String(cause),
+      );
+    }
+  });
+
+  app.get('/guard/positions/:agentId', async (request, reply) => {
+    const { agentId } = request.params as { agentId: string };
+    return send(reply, 200, await guard.positions(agentId, clock()));
+  });
+
   app.get('/guard/policy', (_request, reply) => send(reply, 200, guard.currentPolicy()));
 
   /**

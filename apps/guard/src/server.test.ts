@@ -6,6 +6,7 @@ import {
   acceptingAdapter,
   policyFor,
   setUpHarness,
+  settle,
   AGENT,
   AGENT_WALLET,
   type Harness,
@@ -255,5 +256,114 @@ describe('the operator surface is not reachable by an agent', () => {
     const routes = app.printRoutes();
     // RISK_POLICY_SPEC section 1: no set_policy, no update_limits, nothing like them.
     expect(routes).not.toMatch(/set.?policy|update.?limits|max.?notional/i);
+  });
+});
+
+/**
+ * The read routes the MCP surface is built on. They exist so an agent can see what it may
+ * trade and what it already holds without asking the venue directly — `RISK_POLICY_SPEC.md`
+ * §1 says the agent reaches DreamDEX only through Guard, and that covers reads.
+ */
+describe('the MCP read routes', () => {
+  it('lists only markets the allowlist permits', async () => {
+    const app = build();
+    const body = JSON.parse((await app.inject({ url: '/guard/markets' })).body) as Array<{
+      marketId: string;
+      closesInMs: number;
+    }>;
+    expect(body.map((row) => row.marketId).sort()).toEqual([h.marketId, h.secondMarketId].sort());
+    expect(body.every((row) => row.closesInMs > 0)).toBe(true);
+  });
+
+  it('drops a market the allowlist does not name, rather than offering a certain refusal', async () => {
+    const guard = new Guard({
+      db: h.opened.db,
+      adapter: acceptingAdapter(h.replay),
+      policy: policyFor(h, { allowedMarkets: [h.marketId] }),
+      wallets: new Map([[AGENT, AGENT_WALLET]]),
+    });
+    const app = buildGuardServer({ guard, clock: () => h.now });
+    const body = JSON.parse((await app.inject({ url: '/guard/markets' })).body) as Array<{
+      marketId: string;
+    }>;
+    expect(body.map((row) => row.marketId)).toEqual([h.marketId]);
+  });
+
+  /**
+   * The same filter `evaluate` applies as TOO_CLOSE_TO_CLOSE. Listing a market an order
+   * would certainly be refused on spends the agent's turn to tell it something Guard
+   * already knew.
+   */
+  it('drops a market inside minTimeToCloseMs', async () => {
+    const guard = new Guard({
+      db: h.opened.db,
+      adapter: acceptingAdapter(h.replay),
+      policy: policyFor(h, { minTimeToCloseMs: 86_400_000 }),
+      wallets: new Map([[AGENT, AGENT_WALLET]]),
+    });
+    const app = buildGuardServer({ guard, clock: () => h.now });
+    expect(JSON.parse((await app.inject({ url: '/guard/markets' })).body)).toEqual([]);
+  });
+
+  it('quotes a market through the adapter Guard already marks positions with', async () => {
+    const app = build();
+    const response = await app.inject({ url: `/guard/quote/${h.marketId}` });
+    expect(response.statusCode).toBe(200);
+    const quote = JSON.parse(response.body) as { marketId: string; midUp: number | null };
+    expect(quote.marketId).toBe(h.marketId);
+    expect(quote.midUp).not.toBeUndefined();
+  });
+
+  it('answers 502 rather than 500 when the venue cannot price a market', async () => {
+    const guard = new Guard({
+      db: h.opened.db,
+      adapter: {
+        ...acceptingAdapter(h.replay),
+        getQuote: () => Promise.reject(new Error('no book')),
+      },
+      policy: policyFor(h),
+      wallets: new Map([[AGENT, AGENT_WALLET]]),
+    });
+    const app = buildGuardServer({ guard, clock: () => h.now });
+    const response = await app.inject({ url: `/guard/quote/${h.marketId}` });
+    expect(response.statusCode).toBe(502);
+    expect((JSON.parse(response.body) as { error: { code: string } }).error.code).toBe(
+      'UPSTREAM_UNAVAILABLE',
+    );
+  });
+
+  it('reports an open position after an order is forwarded, and drops it once settled', async () => {
+    const app = build();
+    expect((await submit(app)).statusCode).toBe(200);
+
+    const open = JSON.parse(
+      (await app.inject({ url: `/guard/positions/${AGENT}` })).body,
+    ) as Array<{
+      marketId: string;
+      stake: string;
+      side: string;
+    }>;
+    expect(open).toHaveLength(1);
+    expect(open[0]?.marketId).toBe(h.marketId);
+    // A bigint crosses the wire as a decimal string, never as a number (CLAUDE.md I5).
+    expect(open[0]?.stake).toBe('10000000');
+    expect(open[0]?.side).toBe('UP');
+
+    settle(h.opened, h.marketId, 'UP', h.now + 1);
+    expect(JSON.parse((await app.inject({ url: `/guard/positions/${AGENT}` })).body)).toEqual([]);
+  });
+
+  it('reports no position for an agent that has placed nothing', async () => {
+    const app = build();
+    expect(JSON.parse((await app.inject({ url: '/guard/positions/nobody' })).body)).toEqual([]);
+  });
+
+  it('leaves all three unauthenticated but read-only: none of them changes the policy', async () => {
+    const app = build(TOKEN);
+    const before = (await app.inject({ url: '/guard/policy' })).body;
+    await app.inject({ url: '/guard/markets' });
+    await app.inject({ url: `/guard/quote/${h.marketId}` });
+    await app.inject({ url: `/guard/positions/${AGENT}` });
+    expect((await app.inject({ url: '/guard/policy' })).body).toBe(before);
   });
 });
