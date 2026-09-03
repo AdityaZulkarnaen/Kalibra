@@ -46,6 +46,8 @@ export const guardConfigSchema = z.object({
   GUARD_AGENT_KEYS: z.string().default(''),
   /** Override for the chain WebSocket. The SDK's Shannon definition carries one already. */
   SOMNIA_WS_RPC_URL: z.string().optional(),
+  /** Deadline for one placement. A venue read that never settles must not wedge Guard. */
+  GUARD_ORDER_TIMEOUT_MS: z.coerce.number().int().min(5000).max(300_000).default(45_000),
   /** How long a resting order survives, in ms — the dead-man's switch for a crashed agent. */
   GUARD_ORDER_TTL_MS: z.coerce.number().int().min(1000).max(3_600_000).default(120_000),
 });

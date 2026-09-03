@@ -258,5 +258,31 @@ export class Supervisor {
   }
 }
 
+/**
+ * Fails a promise that never settles.
+ *
+ * This is the difference between a run that survives two days and one that quietly stops.
+ * The collection loop hung for two hours and nineteen minutes on a venue read that never
+ * resolved and never rejected — no error, no exit, no cycle. A crash would have been visible
+ * in the log and, being a supervised process, would have restarted. A hang is neither.
+ *
+ * Nothing here can assume a remote call terminates on its own.
+ */
+export function withTimeout<T>(work: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} did not answer within ${ms}ms`)), ms);
+    work.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (cause: unknown) => {
+        clearTimeout(timer);
+        reject(cause instanceof Error ? cause : new Error(String(cause)));
+      },
+    );
+  });
+}
+
 export const describe = (cause: unknown): string =>
   cause instanceof Error ? (cause.message.split('\n')[0] ?? cause.message) : String(cause);

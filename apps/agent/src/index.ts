@@ -7,7 +7,7 @@ import {
 import { z } from 'zod';
 
 import { STRATEGIES } from './strategy.js';
-import { Supervisor, describe, type GuardClient, type Venue } from './supervisor.js';
+import { Supervisor, describe, withTimeout, type GuardClient, type Venue } from './supervisor.js';
 
 /**
  * `pnpm agents` — runs the demo agents continuously against Guard.
@@ -32,6 +32,10 @@ const configSchema = z.object({
   AGENT_MARKET_LIMIT: z.coerce.number().int().min(1).max(500).default(25),
   /** How far through the touch to bid. Two ticks on this venue. */
   AGENT_SLIPPAGE: z.coerce.number().min(0).max(0.2).default(0.002),
+  /** A cycle that outlives this is abandoned. It must exceed the time a full cycle needs. */
+  AGENT_CYCLE_TIMEOUT_MS: z.coerce.number().int().min(10_000).max(600_000).default(120_000),
+  /** Per-request deadline for a single call to Guard or the venue. */
+  AGENT_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120_000).default(20_000),
   AGENT_LOG_PATH: z.string().default('./logs/collection.jsonl'),
 });
 
@@ -78,7 +82,11 @@ const venue: Venue = {
     // fill, which is what scoring wants and what quoting must not use. One indexer round-trip
     // for the whole list — the per-market chain version exhausted the socket in minutes.
     try {
-      return await readBookTops((await sessionClient()).client, marketIds);
+      return await withTimeout(
+        readBookTops((await sessionClient()).client, marketIds),
+        config.AGENT_REQUEST_TIMEOUT_MS,
+        'book tops',
+      );
     } catch (cause) {
       // A dead connection poisons every later read through it, so the session is dropped and
       // the next cycle opens a fresh one rather than retrying down the same pipe forever.
@@ -96,6 +104,9 @@ const post = async (path: string, body: unknown, token?: string): Promise<Respon
       ...(token === undefined ? {} : { authorization: `Bearer ${token}` }),
     },
     body: JSON.stringify(body),
+    // Guard forwards to the chain before answering, so a wedged venue would otherwise hold
+    // this request open indefinitely and take the whole loop with it.
+    signal: AbortSignal.timeout(config.AGENT_REQUEST_TIMEOUT_MS),
   });
 
 const guard: GuardClient = {
@@ -147,7 +158,7 @@ console.log(`log ${config.AGENT_LOG_PATH}\n`);
 for (;;) {
   const startedAt = Date.now();
   try {
-    const report = await supervisor.runCycle();
+    const report = await withTimeout(supervisor.runCycle(), config.AGENT_CYCLE_TIMEOUT_MS, 'cycle');
     console.log(
       `${new Date().toISOString()}  ` +
         `markets ${report.considered}  submitted ${report.submitted}  ` +
@@ -157,6 +168,10 @@ for (;;) {
     // A cycle that throws is one lost cycle, not a lost run. The venue drops a socket, Guard
     // restarts, a window locks mid-read; none of that should end a two-day collection.
     console.error(`${new Date().toISOString()}  cycle failed: ${describe(cause)}`);
+    // A cycle that timed out probably left a connection wedged behind it. Abandoning the
+    // promise does not close the socket, so the session goes too and the next cycle dials
+    // afresh rather than inheriting whatever stopped answering.
+    await dropSession();
   }
   const elapsed = Date.now() - startedAt;
   await new Promise((resolve) =>

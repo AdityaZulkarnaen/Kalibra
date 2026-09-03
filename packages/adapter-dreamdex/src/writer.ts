@@ -22,6 +22,14 @@ export interface WriterConfig extends SomniaConfig {
    * the book. Clamped to the market's own expiry by the pool, which rejects anything beyond it.
    */
   readonly orderTtlMs?: number;
+  /**
+   * Deadline for one placement, end to end.
+   *
+   * Nothing here may assume a remote call terminates. A venue read that never settles holds
+   * the HTTP request that triggered it open, and the caller's loop with it — a hang stops a
+   * run just as dead as a crash, without the log entry that would let anyone notice.
+   */
+  readonly timeoutMs?: number;
 }
 
 /** 2 — ImmediateOrCancel. 3 — PostOnly. From the SDK's own ORDER_TYPE. */
@@ -29,6 +37,29 @@ const ORDER_TYPE_IOC = 2;
 const ORDER_TYPE_POST_ONLY = 3;
 
 const DEFAULT_TTL_MS = 120_000;
+
+/** Long enough for a slow confirmation, short enough that a wedged socket is not forever. */
+const DEFAULT_TIMEOUT_MS = 45_000;
+
+/**
+ * Rejects when `work` outlives `ms`. The underlying call is not cancelled — it cannot be —
+ * so the caller drops the session afterwards rather than reusing whatever stopped answering.
+ */
+function withDeadline<T>(work: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    work.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (cause: unknown) => {
+        clearTimeout(timer);
+        reject(cause instanceof Error ? cause : new Error(String(cause)));
+      },
+    );
+  });
+}
 
 /** Somnia's MarketStatus enum: 0 Listed, 1 Trading, 2 Locked, 3 Settling, 4 Resolved, 5 Voided. */
 const STATUS_TRADING = 1;
@@ -71,7 +102,11 @@ export class SomniaWriter {
    */
   async placeOrder(order: CanonicalOrder): Promise<CanonicalOrderResult> {
     try {
-      return await this.send(order);
+      return await withDeadline(
+        this.send(order),
+        this.config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        `placing ${order.clientOrderId}`,
+      );
     } catch (cause) {
       // A dead connection poisons every later write through it, so it is dropped here and the
       // next order opens a fresh one rather than retrying down the same pipe forever.
