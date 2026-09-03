@@ -118,15 +118,25 @@ export class Supervisor {
       const view = this.viewOf(market, tops.get(market.marketId.toLowerCase()), at);
       if (view === null) continue;
 
-      for (const strategy of strategies) {
+      // The three agents are independent and sign from different wallets, so their orders
+      // go out together rather than one waiting on the last one's chain write. Sequentially
+      // a full cycle could need eighteen confirmations end to end, which outlived the
+      // watchdog and got the whole cycle abandoned.
+      const priced = strategies.flatMap((strategy) => {
         const intent = strategy.decide(view);
-        if (intent === null) continue;
+        if (intent === null) return [];
         const limitProb = this.priceFor(intent, view);
         // No edge left once the achievable price is used instead of the mid. Not an error:
         // the strategy had a view and the book had already taken it.
-        if (limitProb === null) continue;
-        submitted += 1;
-        const outcome = await this.send(strategy, intent, view, limitProb);
+        if (limitProb === null) return [];
+        return [{ strategy, intent, limitProb }];
+      });
+
+      submitted += priced.length;
+      const outcomes = await Promise.all(
+        priced.map((row) => this.send(row.strategy, row.intent, row.limitProb, view)),
+      );
+      for (const outcome of outcomes) {
         if (outcome === 'ALLOW') allowed += 1;
         else if (outcome === 'DENY') denied += 1;
         else failed += 1;
@@ -203,9 +213,10 @@ export class Supervisor {
   private async send(
     strategy: Strategy,
     intent: Intent,
-    view: MarketView,
     limitProb: number,
+    view: MarketView,
   ): Promise<'ALLOW' | 'DENY' | 'FAILED'> {
+    // Incremented before any await, so concurrent sends cannot draw the same number.
     this.sequence += 1;
     const clientOrderId = `${strategy.agentId}-${view.marketId.slice(-8)}-${this.sequence}`;
     try {

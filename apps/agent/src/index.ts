@@ -34,8 +34,15 @@ const configSchema = z.object({
   AGENT_SLIPPAGE: z.coerce.number().min(0).max(0.2).default(0.002),
   /** A cycle that outlives this is abandoned. It must exceed the time a full cycle needs. */
   AGENT_CYCLE_TIMEOUT_MS: z.coerce.number().int().min(10_000).max(600_000).default(120_000),
-  /** Per-request deadline for a single call to Guard or the venue. */
-  AGENT_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120_000).default(20_000),
+  /**
+   * Per-request deadline for one call to Guard or the venue.
+   *
+   * Must exceed Guard's own placement deadline. Guard forwards to the chain and waits for a
+   * receipt before answering, so a client that gives up first turns a real venue refusal into
+   * an opaque "operation was aborted" and loses the reason code entirely — which is what
+   * happened at twenty seconds against Guard's forty-five.
+   */
+  AGENT_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120_000).default(60_000),
   AGENT_LOG_PATH: z.string().default('./logs/collection.jsonl'),
 });
 

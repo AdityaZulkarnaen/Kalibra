@@ -55,6 +55,16 @@ export interface LiveAdapterConfig {
    */
   readonly includeUntraded?: boolean;
   /**
+   * How long a fetched market list may be reused, in ms.
+   *
+   * `getQuote` needs the market's decimals and pool, so it re-read the whole list on every
+   * call. Guard marks each open position on every order it evaluates, so one agent with six
+   * open positions paid six full market-list queries per order, three agents in parallel paid
+   * eighteen, and the request outlived every deadline above it. The list only changes when a
+   * window rolls, which is minutes, so re-reading it per quote bought nothing at all.
+   */
+  readonly marketCacheMs?: number;
+  /**
    * Supplied only when this adapter is allowed to write. Absent, `placeOrder` throws, which
    * keeps live ingestion runnable with no credential at all — the venue's read surface is
    * permissionless (U20) and nothing about reading it should require a funded wallet.
@@ -67,6 +77,8 @@ export class LiveAdapter implements DreamDexAdapter {
     fetch: FetchLike;
   };
   private readonly writer: SomniaWriter | undefined;
+  private cachedMarkets: { at: number; markets: VenueMarket[] } | null = null;
+  private inFlight: Promise<VenueMarket[]> | null = null;
 
   constructor(config: LiveAdapterConfig) {
     this.config = {
@@ -74,6 +86,7 @@ export class LiveAdapter implements DreamDexAdapter {
       fetch: config.fetch ?? ((url, init) => globalThis.fetch(url, init)),
       marketLimit: config.marketLimit ?? 200,
       includeUntraded: config.includeUntraded ?? false,
+      marketCacheMs: config.marketCacheMs ?? 15_000,
     };
     this.writer = config.writer;
   }
@@ -165,7 +178,27 @@ export class LiveAdapter implements DreamDexAdapter {
     return parsed.data;
   }
 
+  /**
+   * Cached briefly, and de-duplicated while in flight so concurrent callers share one query
+   * rather than each starting their own.
+   */
   private async fetchMarkets(): Promise<VenueMarket[]> {
+    const now = Date.now();
+    const cached = this.cachedMarkets;
+    if (cached !== null && now - cached.at < this.config.marketCacheMs) return cached.markets;
+    this.inFlight ??= this.loadMarkets().finally(() => {
+      this.inFlight = null;
+    });
+    return this.inFlight;
+  }
+
+  private async loadMarkets(): Promise<VenueMarket[]> {
+    const markets = await this.queryMarkets();
+    this.cachedMarkets = { at: Date.now(), markets };
+    return markets;
+  }
+
+  private async queryMarkets(): Promise<VenueMarket[]> {
     const result = await this.query(
       // Two different questions, so two different orderings.
       //
