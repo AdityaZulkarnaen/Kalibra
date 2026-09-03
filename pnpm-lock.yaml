@@ -11,6 +11,9 @@ importers:
       '@kalibra/adapter-dreamdex':
         specifier: workspace:*
         version: link:packages/adapter-dreamdex
+      '@kalibra/agent':
+        specifier: workspace:*
+        version: link:apps/agent
       '@kalibra/api':
         specifier: workspace:*
         version: link:apps/api
@@ -84,6 +87,18 @@ importers:
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.4.0)(jsdom@30.0.1(@noble/hashes@2.4.0))(vite@8.2.2(@types/node@26.4.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13))
+
+  apps/agent:
+    dependencies:
+      '@kalibra/adapter-dreamdex':
+        specifier: workspace:*
+        version: link:../../packages/adapter-dreamdex
+      '@kalibra/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      zod:
+        specifier: ^4.5.4
+        version: 4.5.4
 
   apps/api:
     dependencies:
