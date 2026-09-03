@@ -225,8 +225,9 @@ on day 5.
 ```
 kalibra/
 ├── README.md
-├── CLAUDE.md
-├── AGENTS.md                    → symlink to CLAUDE.md (DreamDEX convention)
+├── CLAUDE.md                    how code is written here
+├── AGENTS.md                    entry point for an agent, in either sense (see note)
+├── SKILL.md                     how a trading agent uses the MCP tools
 ├── package.json                 workspace root, all scripts
 ├── pnpm-workspace.yaml
 ├── tsconfig.base.json
@@ -268,6 +269,8 @@ kalibra/
 │   ├── indexer/
 │   ├── api/
 │   ├── guard/
+│   ├── mcp/                     Guard as an MCP server, over stdio
+│   ├── agent/                   demo agents that trade through Guard
 │   └── web/
 │
 ├── fixtures/
@@ -280,6 +283,13 @@ kalibra/
     ├── generate-fixtures.ts
     └── demo.ts
 ```
+
+**`AGENTS.md` is a real file, not a symlink to `CLAUDE.md`.** This repository is developed
+on Windows with `core.symlinks = false`, where a committed symlink checks out as a text
+file containing the path it points at — worse than either alternative. It is also not a
+copy: the two documents answer different questions. `CLAUDE.md` is the contract for writing
+code here; `AGENTS.md` routes an arriving agent to `CLAUDE.md` for that, or to `SKILL.md` if
+it came to trade rather than to build. Nothing is restated between them, so nothing drifts.
 
 ---
 
@@ -298,6 +308,7 @@ API_PORT=3001
 GUARD_PORT=3002
 GUARD_POLICY_PATH=./guard.policy.json
 GUARD_OPERATOR_TOKEN=            unset means the operator routes are not registered
+MCP_AGENT_ID=                    the one agent the MCP server speaks for; no default
 GUARD_AGENT_WALLETS=             agentId=0xwallet pairs, comma separated
 KALIBRA_API_URL=http://127.0.0.1:3001   apps/web reads the index from here
 ```

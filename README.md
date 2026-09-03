@@ -66,6 +66,19 @@ pnpm web           # Next.js on :3000, reading that API and nothing else
 pnpm guard         # policy engine on :3002, between an agent and the venue
 ```
 
+To put agents in front of it:
+
+```bash
+pnpm register-agents  # enters the demo agents in the Arena, through the public endpoint
+pnpm agents           # the three demo agents, trading through Guard
+pnpm mcp              # Guard as an MCP server over stdio, for any MCP-capable agent
+```
+
+An agent connecting over MCP should read [`SKILL.md`](SKILL.md): the six tools, the order to
+call them in, how to read a refusal, and what the score actually rewards. An agent working
+*on* this repository should read [`AGENTS.md`](AGENTS.md) and then
+[`CLAUDE.md`](CLAUDE.md).
+
 `pnpm demo` is the canonical entry point for reviewers. It must succeed on a clean
 machine with no network access and no credentials. See
 [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md) for what that guarantee costs and why it is
@@ -80,8 +93,9 @@ Somnia interaction with a transaction hash or a captured response in `fixtures/`
 `REPLAY` means recorded real data; `SYNTHETIC` means generated data with the real
 integration unverified; `STUB` means the interface exists and the implementation does not.
 
-**As of day 6 of nine, complete (`docs/BUILD_PLAN.md`).** One row below is `LIVE`; the rest
-run on generated data.
+**As of day 7 of nine, complete (`docs/BUILD_PLAN.md`).** Five rows below are `LIVE`; the
+rest run on generated data. The agents are still trading, so the counts in those rows are a
+snapshot taken on 3 September and will have grown; the transaction hashes will not.
 
 | Component | Status | Evidence |
 |---|---|---|
@@ -97,11 +111,14 @@ run on generated data.
 | Web app (`apps/web`) | SYNTHETIC | Leaderboard and `/w/:address` profile, rendered per request from `apps/api` with no hardcoded, cached or fallback data — verified by killing the API and confirming the page shows an error rather than numbers. The data it displays is the synthetic fixture set. |
 | Guard policy engine (`packages/core/src/policy.ts`) | SYNTHETIC | All eleven reason codes from `docs/RISK_POLICY_SPEC.md` §4, one test each asserting that code and no other, plus the rule ordering: a killed agent over its daily loss sees `KILL_SWITCH_ACTIVE`. Pure — the clock is an argument. |
 | Guard audit chain (`packages/core/src/audit.ts`) | SYNTHETIC | Keccak-256 over canonical JSON. Verified in both directions: a clean log passes, and insertion, deletion, reordering and a single rewritten field each fail at the right index. Demonstrated against a live SQLite log, below. |
-| Guard transport (`apps/guard`) | SYNTHETIC | HTTP surface, orders forwarded through the adapter, fills written to `trades` with `source = 'GUARD'`. Guard now holds a signing key per agent and can reach the live venue, but **no order has yet been placed through Guard itself** — the one real order above went direct, to prove the write path before three agents depended on it. This row changes when a Guard-forwarded order lands. |
+| Guard transport (`apps/guard`) | **LIVE** | Orders from the demo agents are evaluated by Guard and forwarded to the pool under each agent's own key. Four Guard-forwarded fills are on Shannon, every one status `success`, each sent from the wallet its agent is scored under: [`0x0dec9ecb…`](https://shannon-explorer.somnia.network/tx/0x0dec9ecbb4aae319c8b66cf6c41a5f9ccca4b176899b8872608134cdb1c734a4) (block 478460478), [`0x3c8b17d0…`](https://shannon-explorer.somnia.network/tx/0x3c8b17d0fc6ac66e19f6924c41def312f75bc81bf8e3ffb8b247c89b979690e6), [`0x74c7ccad…`](https://shannon-explorer.somnia.network/tx/0x74c7ccadb1135698b3e8548a4d95ad5ef9326f6746fe25cd32c4aaf60fa6d017), [`0xf6552b9c…`](https://shannon-explorer.somnia.network/tx/0xf6552b9c208cd550a313321a686c8af075097e1cabfe4f0eb609c629d48a2924). Receipts re-checked against the chain, not read back from our own log. |
+| Guard enforcement in the live loop | **LIVE** | 812 audit entries from three agents trading the testnet, 3 Sep: 391 allowed and 421 refused, across ten of the eleven reason codes — including 43 `ORDER_TOO_LARGE` from `contrarian-fade`, which sizes past the limit on purpose so that the refusals in the log are produced by an agent trading rather than by a script staging them. The eleventh, `RATE_LIMIT_EXCEEDED`, has not been reached: the agents pace themselves below it. |
+| Kalibra Arena (`/v1/arena`) | **LIVE** | The three demo agents registered through the public `POST /v1/arena/register` endpoint — no row was inserted behind it — and are ranked on the same scores their wallets earn on the main leaderboard, verified field by field against `/v1/wallet/:address` by a test. On 3 Sep `contrarian-fade` was `RANKED` at 148 over 36 resolved positions from live Shannon fills, and the other two were `PROVISIONAL`, showing a sample count rather than a number. 148 is well below 500, which says that agent's deviations from market price were worse than noise — that is what the data says, and it is reported rather than tuned away. |
+| MCP server (`apps/mcp`) | SYNTHETIC | A real MCP client connects over the SDK transport and lists exactly the six tools of `docs/RISK_POLICY_SPEC.md` §7, in CI; the stdio entrypoint was additionally driven by hand against the running Guard and listed the same six. No policy-mutation tool exists, asserted by driving every tool and both resources through a recording transport and checking that the only write any of them produced was `POST /guard/order`. **No order has yet been placed through MCP against the live venue** — the tools reach Guard, and Guard's write path is the LIVE row above. |
 | `pnpm demo` | SYNTHETIC | Runs the whole pipeline offline into an in-memory database and asserts the result byte-for-byte against `fixtures/expected/demo-output.json`. |
 
-Arena does not exist yet, so it is not listed — there is nothing to claim about it. Rows
-are added as components land.
+Rows are added as components land. The Arena numbers move as more windows settle; the
+transaction hashes do not.
 
 ### These are Event Contracts, not spot
 
