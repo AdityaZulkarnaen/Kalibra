@@ -1,20 +1,28 @@
 import { LAMBDA_MAX, MIN_SAMPLE, SHRINK_K, binRange, paramsHash } from '@kalibra/core';
 import {
+  readArenaLeaderboard,
   readCalibration,
   readLeaderboard,
   readMarkets,
+  readStats,
   readWalletPositions,
   readWalletScore,
+  registerAgent,
   walletHasPositions,
   type KalibraDatabase,
 } from '@kalibra/db';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
+import { RateLimiter } from './rate-limit.js';
 import {
+  arenaSchema,
   leaderboardSchema,
   marketsSchema,
   pageSchema,
+  registerRequestSchema,
+  registeredAgentSchema,
+  statsSchema,
   walletPositionsSchema,
   walletSchema,
 } from './schemas.js';
@@ -29,6 +37,12 @@ import {
  */
 export interface ServerOptions {
   readonly validateResponses?: boolean;
+  /**
+   * Supplied so the registration rate limit can be tested without waiting an hour. The
+   * read paths take no clock at all: every timestamp they return was written by the
+   * pipeline.
+   */
+  readonly clock?: () => number;
 }
 
 interface ErrorBody {
@@ -41,7 +55,9 @@ const fail = (code: ErrorBody['error']['code'], message: string): ErrorBody => (
 
 export function buildServer(db: KalibraDatabase, options: ServerOptions = {}): FastifyInstance {
   const validate = options.validateResponses ?? false;
+  const clock = options.clock ?? Date.now;
   const app = Fastify({ logger: false });
+  const registrations = new RateLimiter({ limit: 5, windowMs: 60 * 60 * 1000 });
 
   const send = <T>(schema: z.ZodType<T>, body: T): T => {
     if (!validate) return body;
@@ -226,6 +242,116 @@ export function buildServer(db: KalibraDatabase, options: ServerOptions = {}): F
     );
   });
 
+  /**
+   * Arena (`PRD.md` §4.2). The same numbers as the main leaderboard, restricted to wallets
+   * that have registered an agent — no separate scoring, no separate table of results.
+   *
+   * Unlike `/v1/leaderboard` this defaults to every registered agent rather than to the
+   * ranked ones. The main board ranks thousands of wallets and a provisional tail would
+   * bury the ranking; the Arena is a registry of a handful, and an agent that registered
+   * and has not yet cleared the minimum sample is a fact about the Arena, not noise.
+   * `?status=ranked` narrows it.
+   */
+  app.get('/v1/arena', (request, reply) => {
+    const page = pageSchema.safeParse(request.query);
+    if (!page.success) {
+      return reply.code(400).send(fail('BAD_REQUEST', z.prettifyError(page.error)));
+    }
+    const statusFilter = z
+      .enum(['ranked', 'all'])
+      .default('all')
+      .safeParse((request.query as Record<string, unknown>)['status'] ?? undefined);
+    if (!statusFilter.success) {
+      return reply.code(400).send(fail('BAD_REQUEST', 'status must be ranked or all'));
+    }
+
+    const { total, rows } = readArenaLeaderboard(db, page.data, statusFilter.data === 'ranked');
+    return reply.send(
+      send(arenaSchema, {
+        params: {
+          lambdaMax: LAMBDA_MAX,
+          shrinkK: SHRINK_K,
+          minSample: MIN_SAMPLE,
+          paramsHash: paramsHash(),
+        },
+        total,
+        entries: rows.map((row, index) => ({
+          rank: page.data.offset + index + 1,
+          wallet: row.wallet,
+          score: row.score,
+          status: row.status as 'RANKED' | 'PROVISIONAL',
+          n: row.n,
+          bss: row.bss,
+          eceExcess: row.eceExcess,
+          auc: row.auc,
+          isAgent: true,
+          agentName: row.agentName,
+          agentId: row.agentId,
+          method: row.method,
+          registeredAt: row.registeredAt,
+        })),
+      }),
+    );
+  });
+
+  /**
+   * The only write on the read surface, and it writes a display name. `API_SPEC.md` §2 is
+   * explicit that this is unauthenticated on purpose: registering claims nothing a score
+   * depends on, because the score is derived from on-chain behaviour that registering
+   * cannot touch.
+   */
+  app.post('/v1/arena/register', (request, reply) => {
+    const now = clock();
+    const verdict = registrations.take(clientKey(request.ip), now);
+    if (!verdict.allowed) {
+      return reply
+        .code(429)
+        .header('Retry-After', String(verdict.retryAfter))
+        .send(fail('BAD_REQUEST', 'registration is limited to 5 per hour'));
+    }
+
+    const body = registerRequestSchema.safeParse(request.body);
+    if (!body.success) {
+      return reply.code(400).send(fail('BAD_REQUEST', z.prettifyError(body.error)));
+    }
+    const agentId = slugify(body.data.name);
+    if (agentId === '') {
+      return reply.code(400).send(fail('BAD_REQUEST', 'name must contain a letter or a digit'));
+    }
+
+    const result = registerAgent(db, {
+      agentId,
+      wallet: body.data.wallet.toLowerCase(),
+      name: body.data.name,
+      description: body.data.description ?? null,
+      method: body.data.method ?? null,
+      registeredAt: now,
+    });
+    if (result.outcome === 'DUPLICATE_WALLET') {
+      return reply.code(400).send(fail('BAD_REQUEST', 'that wallet is already registered'));
+    }
+    if (result.outcome === 'DUPLICATE_AGENT_ID') {
+      return reply.code(400).send(fail('BAD_REQUEST', `the name "${body.data.name}" is taken`));
+    }
+    return reply.code(201).send(send(registeredAgentSchema, result.agent));
+  });
+
+  app.get('/v1/stats', (_request, reply) => {
+    const stats = readStats(db);
+    return reply.send(
+      send(statsSchema, {
+        totalWallets: stats.totalWallets,
+        rankedWallets: stats.rankedWallets,
+        positionsScored: stats.positionsScored,
+        marketsSettled: stats.marketsSettled,
+        mode: stats.mode as 'replay' | 'live' | null,
+        lastIngestedAt: stats.lastIngestedAt,
+        paramsHash: stats.paramsHash,
+        rejectedPayloads: null,
+      }),
+    );
+  });
+
   return app;
 }
 
@@ -238,3 +364,22 @@ function normaliseAddress(params: unknown): string | null {
 
 const squaredError = (forecast: number | null, y: number | null): number | null =>
   forecast === null || y === null ? null : (forecast - y) ** 2;
+
+/**
+ * The rate-limit key. Fastify reports an unknown address as an empty string; those share
+ * one bucket rather than each getting a fresh allowance.
+ */
+const clientKey = (ip: string | undefined): string =>
+  ip === undefined || ip === '' ? 'unknown' : ip;
+
+/**
+ * `agent_id` from the display name, so the identifier and the name cannot disagree. Two
+ * names that slug the same collide, and the second registration is refused rather than
+ * being quietly given a suffixed identifier nobody asked for.
+ */
+const slugify = (name: string): string =>
+  name
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9]+/gu, '-')
+    .replace(/^-+|-+$/gu, '');

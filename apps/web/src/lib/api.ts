@@ -1,4 +1,4 @@
-import { leaderboardSchema, walletSchema } from '@kalibra/api/schemas';
+import { arenaSchema, leaderboardSchema, walletSchema } from '@kalibra/api/schemas';
 import { KalibraError } from '@kalibra/core/errors';
 import { z } from 'zod';
 
@@ -16,6 +16,8 @@ import { z } from 'zod';
 
 export type Leaderboard = z.infer<typeof leaderboardSchema>;
 export type LeaderboardEntry = Leaderboard['entries'][number];
+export type Arena = z.infer<typeof arenaSchema>;
+export type ArenaEntry = Arena['entries'][number];
 export type Wallet = z.infer<typeof walletSchema>;
 export type CalibrationBin = Wallet['calibration'][number];
 export type ScoringParams = Leaderboard['params'];
@@ -97,4 +99,17 @@ export function fetchLeaderboard(
 
 export function fetchWallet(address: string, options: ApiOptions = {}): Promise<Wallet> {
   return get(`/v1/wallet/${encodeURIComponent(address)}`, walletSchema, options);
+}
+
+/**
+ * The Arena defaults to every registered agent rather than to the ranked ones, matching
+ * the endpoint. A registry of a handful that hid its provisional members would read as
+ * empty for as long as the agents were still collecting positions.
+ */
+export function fetchArena(
+  status: LeaderboardStatus,
+  limit: number,
+  options: ApiOptions = {},
+): Promise<Arena> {
+  return get(`/v1/arena?status=${status}&limit=${limit}`, arenaSchema, options);
 }

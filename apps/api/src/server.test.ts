@@ -8,10 +8,14 @@ import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
+  arenaSchema,
   errorSchema,
   leaderboardExampleSchema,
   leaderboardSchema,
   marketsSchema,
+  registerRequestExampleSchema,
+  registeredAgentSchema,
+  statsSchema,
   walletExampleSchema,
   walletPositionsSchema,
   walletSchema,
@@ -29,7 +33,7 @@ let provisionalWallet: string;
 beforeAll(async () => {
   opened = openDatabase(':memory:');
   const adapter = await ReplayAdapter.fromDirectory(join(ROOT, 'fixtures', 'synthetic'));
-  await runIngest(adapter, opened.db, { ingestedAt: AT });
+  await runIngest(adapter, opened.db, { ingestedAt: AT, mode: 'replay' });
   runPipeline(opened.db, { computedAt: AT });
   app = buildServer(opened.db, { validateResponses: true });
 
@@ -86,6 +90,13 @@ describe('the examples in API_SPEC.md parse under the published schemas', () => 
 
   it('the error example', async () => {
     expect(errorSchema.safeParse(await exampleUnder('### 2.1 Conventions')).success).toBe(true);
+  });
+
+  it('the arena registration body', async () => {
+    const result = registerRequestExampleSchema.safeParse(
+      await exampleUnder('### `POST /v1/arena/register`'),
+    );
+    expect(result.success, result.success ? '' : JSON.stringify(result.error.issues)).toBe(true);
   });
 });
 
@@ -248,6 +259,154 @@ describe('GET /v1/markets', () => {
       (await app.inject({ method: 'GET', url: '/v1/markets?underlying=BTC-USD&limit=200' })).json(),
     );
     expect(btc.markets).toHaveLength(20);
+  });
+});
+
+/**
+ * Arena. `PRD.md` section 4.2 is explicit that this adds no scoring machinery, so what
+ * these tests check is that it adds none: the numbers on an Arena row are the wallet's own
+ * numbers, read back through a join.
+ */
+describe('the Arena', () => {
+  /**
+   * Its own server, so the rate limiter starts empty and the clock can be driven. It shares
+   * the database, because the point of the Arena is that it reads the same scores.
+   */
+  let arena: FastifyInstance;
+  let now = AT;
+
+  const register = async (body: Record<string, unknown>) =>
+    arena.inject({ method: 'POST', url: '/v1/arena/register', payload: body });
+
+  beforeAll(() => {
+    arena = buildServer(opened.db, { validateResponses: true, clock: () => now });
+  });
+
+  afterAll(async () => {
+    await arena.close();
+    opened.sqlite.prepare('DELETE FROM agents').run();
+  });
+
+  it('registers an agent and derives its id from the name it will be shown under', async () => {
+    const response = await register({
+      wallet: rankedWallet,
+      name: 'Vol Lean v2',
+      description: 'leans against implied vol',
+      method: 'fades the book when realised vol disagrees with it',
+    });
+    expect(response.statusCode).toBe(201);
+    const agent = registeredAgentSchema.parse(response.json());
+    expect(agent.agentId).toBe('vol-lean-v2');
+    expect(agent.wallet).toBe(rankedWallet);
+    expect(agent.registeredAt).toBe(AT);
+  });
+
+  it('refuses a second registration of the same wallet', async () => {
+    const response = await register({ wallet: rankedWallet, name: 'Someone Else' });
+    expect(response.statusCode).toBe(400);
+    expect(errorSchema.parse(response.json()).error.message).toMatch(/already registered/);
+  });
+
+  it('refuses a name that would collide on the derived id', async () => {
+    const response = await register({ wallet: provisionalWallet, name: 'vol lean V2' });
+    expect(response.statusCode).toBe(400);
+    expect(errorSchema.parse(response.json()).error.message).toMatch(/taken/);
+  });
+
+  it('refuses a body that is not a registration', async () => {
+    expect((await register({ wallet: 'not-a-wallet', name: 'valid name' })).statusCode).toBe(400);
+    expect((await register({ name: 'no wallet at all' })).statusCode).toBe(400);
+  });
+
+  it('limits registration to five an hour per address, then lets the window roll', async () => {
+    // A refused registration costs budget too. Were it free, an invalid body would be an
+    // unlimited attempt and the limit would only bind on callers who got it right.
+    const fresh = buildServer(opened.db, { validateResponses: true, clock: () => now });
+    try {
+      for (let i = 0; i < 5; i += 1) {
+        const response = await fresh.inject({
+          method: 'POST',
+          url: '/v1/arena/register',
+          payload: { wallet: 'not a wallet', name: `agent ${i}` },
+        });
+        expect(response.statusCode).toBe(400);
+      }
+      const sixth = await fresh.inject({
+        method: 'POST',
+        url: '/v1/arena/register',
+        payload: { wallet: provisionalWallet, name: 'sixth' },
+      });
+      expect(sixth.statusCode).toBe(429);
+      expect(sixth.headers['retry-after']).toBeDefined();
+
+      now = AT + 60 * 60 * 1000;
+      const later = await fresh.inject({
+        method: 'POST',
+        url: '/v1/arena/register',
+        payload: { wallet: provisionalWallet, name: 'Sixth Try' },
+      });
+      expect(later.statusCode).toBe(201);
+    } finally {
+      now = AT;
+      await fresh.close();
+    }
+  });
+
+  it('ranks registered agents on the numbers their wallets already earned', async () => {
+    const body = arenaSchema.parse((await arena.inject({ url: '/v1/arena' })).json());
+    const entry = body.entries.find((row) => row.agentId === 'vol-lean-v2');
+    expect(entry).toBeDefined();
+    expect(entry?.method).toMatch(/fades the book/);
+    expect(entry?.isAgent).toBe(true);
+
+    const wallet = walletSchema.parse(
+      (await app.inject({ url: `/v1/wallet/${rankedWallet}` })).json(),
+    );
+    expect(entry?.score).toBe(wallet.score);
+    expect(entry?.n).toBe(wallet.n);
+    expect(entry?.auc).toBe(wallet.stats.auc);
+  });
+
+  it('shows a registered agent that has not yet scored, rather than hiding it', async () => {
+    const body = arenaSchema.parse((await arena.inject({ url: '/v1/arena' })).json());
+    const provisional = body.entries.find((row) => row.agentId === 'sixth-try');
+    expect(provisional?.status).toBe('PROVISIONAL');
+    expect(provisional?.score).toBeNull();
+
+    const ranked = arenaSchema.parse(
+      (await arena.inject({ url: '/v1/arena?status=ranked' })).json(),
+    );
+    expect(ranked.entries.some((row) => row.agentId === 'sixth-try')).toBe(false);
+    expect(ranked.total).toBeLessThan(body.total);
+  });
+
+  it('marks the agent on the main leaderboard too, so the two views agree', async () => {
+    const body = leaderboardSchema.parse(
+      (await app.inject({ url: '/v1/leaderboard?limit=200' })).json(),
+    );
+    const entry = body.entries.find((row) => row.wallet === rankedWallet);
+    expect(entry?.isAgent).toBe(true);
+    expect(entry?.agentName).toBe('Vol Lean v2');
+  });
+});
+
+describe('GET /v1/stats', () => {
+  it('reports what the pipeline actually did', async () => {
+    const body = statsSchema.parse((await app.inject({ url: '/v1/stats' })).json());
+    expect(body.totalWallets).toBe(25);
+    expect(body.marketsSettled).toBeGreaterThan(0);
+    expect(body.positionsScored).toBeGreaterThan(0);
+    expect(body.lastIngestedAt).toBe(AT);
+    expect(body.mode).toBe('replay');
+  });
+
+  /**
+   * `ARCHITECTURE.md` section 7 specifies a counter that does not exist yet. Reporting zero
+   * would read as "ingestion is clean"; null reads as "nobody is counting", which is true.
+   */
+  it('reports the rejected-payload count as null rather than as zero', async () => {
+    const body = statsSchema.parse((await app.inject({ url: '/v1/stats' })).json());
+    expect(body.rejectedPayloads).toBeNull();
   });
 });
 

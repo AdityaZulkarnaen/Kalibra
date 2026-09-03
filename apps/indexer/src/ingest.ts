@@ -3,6 +3,7 @@ import {
   applySettlement,
   insertMarket,
   insertTrade,
+  setMeta,
   type KalibraDatabase,
   type TradeSource,
 } from '@kalibra/db';
@@ -20,6 +21,11 @@ export interface IngestOptions {
   readonly ingestedAt: number;
   readonly source?: TradeSource;
   readonly window?: StreamOpts;
+  /**
+   * Recorded in `meta` so `/v1/stats` can say what produced the rows it is reporting on.
+   * Left unset it stays unset: a caller that did not say is not assumed to be replaying.
+   */
+  readonly mode?: 'replay' | 'live';
 }
 
 export interface IngestSummary {
@@ -42,6 +48,7 @@ export async function runIngest(
 ): Promise<IngestSummary> {
   const source = options.source ?? 'FEED';
   const window = options.window ?? {};
+  if (options.mode !== undefined) setMeta(db, 'mode', options.mode);
 
   const marketList = await adapter.listMarkets();
   let marketsInserted = 0;

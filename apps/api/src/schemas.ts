@@ -150,6 +150,76 @@ export const marketsSchema = z.object({
   ),
 });
 
+/**
+ * Arena. `API_SPEC.md` §2: the leaderboard filtered to registered agents, the same shape
+ * plus each agent's `method`.
+ *
+ * The entry schema is derived from `leaderboardSchema` rather than restated, so a field
+ * added to one cannot silently go missing from the other.
+ */
+export const arenaSchema = z.object({
+  params: paramsSchema,
+  total: z.number().int().nonnegative(),
+  entries: z.array(
+    leaderboardSchema.shape.entries.element.extend({
+      agentId: z.string().min(1),
+      method: z.string().nullable(),
+      registeredAt: timestamp,
+    }),
+  ),
+});
+
+/**
+ * The registration request. `agentId` is not in the body: it is derived from the name, so
+ * that a caller cannot claim an identifier that does not match what is displayed.
+ */
+export const registerRequestSchema = z.object({
+  wallet: z.string().regex(/^0x[0-9a-fA-F]{40}$/, 'wallet must be a 0x EVM address'),
+  name: z
+    .string()
+    .trim()
+    .min(2)
+    .max(48)
+    .regex(/^[\p{L}\p{N} ._-]+$/u, 'name may hold letters, digits, spaces, dot, underscore, dash'),
+  description: z.string().trim().max(500).nullish(),
+  method: z.string().trim().max(1000).nullish(),
+});
+
+/** The document elides the address, as it does elsewhere. See `elided` above. */
+export const registerRequestExampleSchema = z.lazy(() =>
+  registerRequestSchema.omit({ wallet: true }).extend({ wallet: elided }),
+);
+
+export const registeredAgentSchema = z.object({
+  agentId: z.string().min(1),
+  wallet,
+  name: z.string(),
+  description: z.string().nullable(),
+  method: z.string().nullable(),
+  registeredAt: timestamp,
+});
+
+export const statsSchema = z.object({
+  totalWallets: z.number().int().nonnegative(),
+  rankedWallets: z.number().int().nonnegative(),
+  positionsScored: z.number().int().nonnegative(),
+  marketsSettled: z.number().int().nonnegative(),
+  /** Null until an ingest has recorded which mode produced these rows. */
+  mode: z.enum(['replay', 'live']).nullable(),
+  lastIngestedAt: timestamp.nullable(),
+  paramsHash: z
+    .string()
+    .regex(/^0x[0-9a-f]{64}$/)
+    .nullable(),
+  /**
+   * `ARCHITECTURE.md` §7 specifies counting rejected upstream payloads and continuing.
+   * The adapters currently throw on a malformed payload instead, so there is no counter to
+   * report — and a zero here would read as "ingestion is clean" rather than "nobody is
+   * counting". Null until that path exists.
+   */
+  rejectedPayloads: z.number().int().nonnegative().nullable(),
+});
+
 /** Pagination, shared by every list endpoint. API_SPEC.md section 2.1. */
 export const pageSchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),

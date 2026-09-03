@@ -1,3 +1,4 @@
+export * from './arena-queries.js';
 export * from './guard-queries.js';
 export * from './migrate.js';
 export * from './pipeline-queries.js';

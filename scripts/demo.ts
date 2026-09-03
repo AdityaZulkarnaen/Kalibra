@@ -46,7 +46,7 @@ async function build(): Promise<DemoOutput> {
   const adapter = await ReplayAdapter.fromDirectory(FIXTURES);
   const { db, close } = openDatabase(':memory:');
   try {
-    const ingest = await runIngest(adapter, db, { ingestedAt: COMPUTED_AT });
+    const ingest = await runIngest(adapter, db, { ingestedAt: COMPUTED_AT, mode: 'replay' });
     const pipeline = runPipeline(db, { computedAt: COMPUTED_AT });
 
     const byReason: Record<string, number> = {};

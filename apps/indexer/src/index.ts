@@ -38,9 +38,13 @@ async function buildAdapter(
   };
 }
 
-async function onePass(adapter: DreamDexAdapter, db: Parameters<typeof runPipeline>[0]) {
+async function onePass(
+  adapter: DreamDexAdapter,
+  db: Parameters<typeof runPipeline>[0],
+  mode: 'replay' | 'live',
+) {
   const now = Date.now();
-  const summary = await runIngest(adapter, db, { ingestedAt: now });
+  const summary = await runIngest(adapter, db, { ingestedAt: now, mode });
   const pipeline = runPipeline(db, { computedAt: now });
   return { summary, pipeline };
 }
@@ -49,11 +53,12 @@ async function main(): Promise<void> {
   const config = loadConfig(process.env);
   const watch = process.argv.includes('--watch');
   const { adapter, label } = await buildAdapter(config);
+  const mode = config.KALIBRA_MODE;
   const { db, close } = openDatabase(config.KALIBRA_DB_PATH);
 
   try {
     if (!watch) {
-      const { summary, pipeline } = await onePass(adapter, db);
+      const { summary, pipeline } = await onePass(adapter, db, mode);
       console.log(`${label} -> ${config.KALIBRA_DB_PATH}`);
       console.log(formatSummary(summary));
       console.log(
@@ -68,7 +73,7 @@ async function main(): Promise<void> {
     console.log(`${label} -> ${config.KALIBRA_DB_PATH}, every ${every / 1000}s`);
     for (;;) {
       try {
-        const { summary, pipeline } = await onePass(adapter, db);
+        const { summary, pipeline } = await onePass(adapter, db, mode);
         console.log(
           `${new Date().toISOString()}  ` +
             `+${summary.marketsInserted}m +${summary.tradesInserted}t +${summary.settlementsApplied}s  ` +

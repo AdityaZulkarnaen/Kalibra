@@ -136,3 +136,16 @@ export function countSettledMarkets(db: KalibraDatabase): number {
     .all();
   return row?.n ?? 0;
 }
+
+/**
+ * `meta` holds the handful of facts about the pipeline itself that no other table records.
+ * `API_SPEC.md` §1 names the keys; `schema_version` is written by `migrate.ts`.
+ */
+export function setMeta(db: KalibraDatabase, key: string, value: string): void {
+  db.run(sql`INSERT OR REPLACE INTO meta (key, value) VALUES (${key}, ${value})`);
+}
+
+export function getMeta(db: KalibraDatabase, key: string): string | null {
+  const [row] = db.all<{ value: string }>(sql`SELECT value FROM meta WHERE key = ${key}`);
+  return row?.value ?? null;
+}

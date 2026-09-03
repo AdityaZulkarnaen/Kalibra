@@ -179,3 +179,46 @@ export function readMarkets(
   `);
   return { total: count?.n ?? 0, rows };
 }
+
+export interface StatsRow {
+  readonly totalWallets: number;
+  readonly rankedWallets: number;
+  readonly positionsScored: number;
+  readonly marketsSettled: number;
+  readonly mode: string | null;
+  readonly lastIngestedAt: number | null;
+  readonly paramsHash: string | null;
+}
+
+/**
+ * Pipeline health (`API_SPEC.md` §2). Every field is read back, none is computed here.
+ *
+ * `paramsHash` comes from the `scores` rows rather than from the running code, because the
+ * question a reader is asking is what the stored numbers were computed under. Those two
+ * differ exactly when the code has changed and the pipeline has not been re-run, which is
+ * the case worth being able to see.
+ */
+export function readStats(db: KalibraDatabase): StatsRow {
+  const [row] = db.all<StatsRow>(sql`
+    SELECT
+      (SELECT count(*) FROM scores)                                  AS totalWallets,
+      (SELECT count(*) FROM scores WHERE status = 'RANKED')          AS rankedWallets,
+      (SELECT count(*) FROM positions WHERE excluded_reason IS NULL
+                                        AND forecast IS NOT NULL)    AS positionsScored,
+      (SELECT count(*) FROM markets WHERE outcome IS NOT NULL)       AS marketsSettled,
+      (SELECT value FROM meta WHERE key = 'mode')                    AS mode,
+      (SELECT max(ingested_at) FROM trades)                          AS lastIngestedAt,
+      (SELECT params_hash FROM scores LIMIT 1)                       AS paramsHash
+  `);
+  return (
+    row ?? {
+      totalWallets: 0,
+      rankedWallets: 0,
+      positionsScored: 0,
+      marketsSettled: 0,
+      mode: null,
+      lastIngestedAt: null,
+      paramsHash: null,
+    }
+  );
+}
