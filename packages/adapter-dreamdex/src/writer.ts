@@ -1,6 +1,6 @@
 import { UnsupportedOperationError } from './adapter.js';
 import type { CanonicalOrder, CanonicalOrderResult } from './canonical.js';
-import { withSomniaClient, type SomniaConfig } from './somnia.js';
+import { openSomniaSession, type SomniaConfig, type SomniaSession } from './somnia.js';
 
 /**
  * The write half of the airlock: a canonical order becomes a real transaction on Somnia.
@@ -41,7 +41,25 @@ const refused = (reason: string): CanonicalOrderResult => ({
 });
 
 export class SomniaWriter {
+  /**
+   * One session, reopened when it dies.
+   *
+   * A client per order looks tidier and does not survive a loop. Three agents placing ten
+   * orders a cycle opened and closed thirty WebSockets a minute, and the venue stopped
+   * answering: every forward came back "WebSocket request failed", which Guard correctly
+   * recorded as UPSTREAM_UNAVAILABLE — thirty-two consecutive times, reading as an outage
+   * rather than as this process opening far too many sockets.
+   */
+  private session: SomniaSession | null = null;
+
   constructor(private readonly config: WriterConfig) {}
+
+  /** Releases the connection. A caller that forgets leaves the process alive. */
+  async close(): Promise<void> {
+    const dying = this.session;
+    this.session = null;
+    if (dying !== null) await dying.close().catch(() => undefined);
+  }
 
   /**
    * Places one order and reports what the venue did with it.
@@ -52,44 +70,60 @@ export class SomniaWriter {
    * business outcome, the other is an unknown, and collapsing them loses the difference.
    */
   async placeOrder(order: CanonicalOrder): Promise<CanonicalOrderResult> {
-    return withSomniaClient(
-      { ...this.config, privateKey: this.config.privateKey },
-      async (client) => {
-        const onchain = await client.getMarketOnchain(order.marketId as `0x${string}`);
-        // Gotcha 1: the indexer lags. An order on a market that just locked reverts, or worse
-        // appears to succeed, so the gate is the chain's own status and never the indexer row.
-        if (onchain.status !== STATUS_TRADING) {
-          return refused(`market status is ${onchain.status}, not Trading`);
-        }
+    try {
+      return await this.send(order);
+    } catch (cause) {
+      // A dead connection poisons every later write through it, so it is dropped here and the
+      // next order opens a fresh one rather than retrying down the same pipe forever.
+      if (!isRevert(cause)) await this.close();
+      return toResult(cause);
+    }
+  }
 
-        const book = await client.getBinaryBookParams(onchain.pool);
-        const sized = quantise(order, onchain.decimals, book);
-        if (sized === null) {
-          // Gotcha 6: anything under one lot floors to zero and the pool takes an order for
-          // nothing. Skipping is the honest outcome; sending it would burn gas to learn this.
-          return refused('quantity rounds below the venue lot or minimum');
-        }
+  private async send(order: CanonicalOrder): Promise<CanonicalOrderResult> {
+    this.session ??= await openSomniaSession({
+      ...this.config,
+      privateKey: this.config.privateKey,
+    });
+    const client = this.session.client;
 
-        const trader = client.createTrader({ privateKey: this.config.privateKey });
-        const result = await trader.placeOrder({
-          pool: onchain.pool,
-          side: order.side === 'UP' ? 'BUY_YES' : 'BUY_NO',
-          price: sized.price,
-          quantity: sized.quantity,
-          orderType: order.postOnly === true ? ORDER_TYPE_POST_ONLY : ORDER_TYPE_IOC,
-          expireTimestampNs: expiryNs(this.config.orderTtlMs ?? DEFAULT_TTL_MS),
-        });
+    const onchain = await client.getMarketOnchain(order.marketId as `0x${string}`);
+    // Gotcha 1: the indexer lags. An order on a market that just locked reverts, or worse
+    // appears to succeed, so the gate is the chain's own status and never the indexer row.
+    if (onchain.status !== STATUS_TRADING) {
+      return refused(`market status is ${onchain.status}, not Trading`);
+    }
 
-        return {
-          accepted: true,
-          venueOrderId: result.orderId?.toString() ?? null,
-          txHash: result.hash.toLowerCase(),
-          rejectReason: null,
-        };
-      },
-    ).catch(toResult);
+    const book = await client.getBinaryBookParams(onchain.pool);
+    const sized = quantise(order, onchain.decimals, book);
+    if (sized === null) {
+      // Gotcha 6: anything under one lot floors to zero and the pool takes an order for
+      // nothing. Skipping is the honest outcome; sending it would burn gas to learn this.
+      return refused('quantity rounds below the venue lot or minimum');
+    }
+
+    const trader = client.createTrader({ privateKey: this.config.privateKey });
+    const result = await trader.placeOrder({
+      pool: onchain.pool,
+      side: order.side === 'UP' ? 'BUY_YES' : 'BUY_NO',
+      price: sized.price,
+      quantity: sized.quantity,
+      orderType: order.postOnly === true ? ORDER_TYPE_POST_ONLY : ORDER_TYPE_IOC,
+      expireTimestampNs: expiryNs(this.config.orderTtlMs ?? DEFAULT_TTL_MS),
+    });
+
+    return {
+      accepted: true,
+      venueOrderId: result.orderId?.toString() ?? null,
+      txHash: result.hash.toLowerCase(),
+      rejectReason: null,
+    };
   }
 }
+
+/** A revert is the venue answering, so the connection is fine and worth keeping. */
+const isRevert = (cause: unknown): boolean =>
+  cause instanceof Error && cause.name === 'ContractRevertError';
 
 /**
  * A decoded contract revert is the venue refusing, which is a result. Anything else — an RPC

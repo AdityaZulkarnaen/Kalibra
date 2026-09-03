@@ -37,14 +37,22 @@ export interface SomniaConfig {
 }
 
 /**
- * Runs `body` against the SDK's native client and releases its watches afterwards, whatever
- * happens. The exchange opens a WebSocket lazily and holds it until closed, so a caller that
- * forgets leaves the process alive.
+ * A client held open across many reads.
+ *
+ * The exchange opens one WebSocket and keeps it. Opening and closing a client per read looks
+ * tidier and does not survive contact with a loop: an agent reading six markets every
+ * forty-five seconds churned a connection per market and the venue started refusing them —
+ * "WebSocket request failed" on every touch, which reads as the venue being down rather than
+ * as this process opening far too many sockets.
+ *
+ * The caller owns the lifetime and must `close()`, or the process will not exit.
  */
-export async function withSomniaClient<T>(
-  config: SomniaConfig,
-  body: (client: SomniaMarketsClient) => Promise<T>,
-): Promise<T> {
+export interface SomniaSession {
+  readonly client: SomniaMarketsClient;
+  close(): Promise<void>;
+}
+
+export async function openSomniaSession(config: SomniaConfig): Promise<SomniaSession> {
   const [{ SomniaMarkets }, { somniaShannon }] = await Promise.all([
     import('@somnia-chain/markets-sdk'),
     import('@somnia-chain/markets-sdk/chains'),
@@ -61,9 +69,21 @@ export async function withSomniaClient<T>(
       collateral: SOMNIA_ADDRESSES.collateral,
     },
   });
+  return { client: exchange.client, close: () => exchange.close() };
+}
+
+/**
+ * Runs `body` against a client opened for this call alone. For a script that reads once; a
+ * loop should hold a {@link SomniaSession} instead.
+ */
+export async function withSomniaClient<T>(
+  config: SomniaConfig,
+  body: (client: SomniaMarketsClient) => Promise<T>,
+): Promise<T> {
+  const session = await openSomniaSession(config);
   try {
-    return await body(exchange.client);
+    return await body(session.client);
   } finally {
-    await exchange.close();
+    await session.close();
   }
 }

@@ -17,13 +17,16 @@ import type { Intent, MarketView, Strategy } from './strategy.js';
 export interface Venue {
   /** Live Event Contract windows, most recently active first. */
   listMarkets(): Promise<CanonicalMarket[]>;
-  /** Live top of book, read from the pool contract rather than reconstructed. */
-  touch(marketId: string): Promise<{
-    bestBidUp: number | null;
-    bestAskUp: number | null;
-    midUp: number | null;
-    status: number;
-  }>;
+  /**
+   * Live top of book for the whole list in one read, rather than reconstructed and rather
+   * than one call per market — the fan-out version exhausted the chain socket within
+   * minutes of running.
+   */
+  tops(
+    marketIds: readonly string[],
+  ): Promise<
+    Map<string, { bestBidUp: number | null; bestAskUp: number | null; midUp: number | null }>
+  >;
 }
 
 export interface GuardClient {
@@ -55,9 +58,6 @@ export interface SupervisorOptions {
   readonly slippage: number;
   readonly now: () => number;
 }
-
-/** Somnia's MarketStatus: 1 is Trading. Anything else cannot take an order. */
-const STATUS_TRADING = 1;
 
 export interface CycleReport {
   readonly considered: number;
@@ -106,8 +106,16 @@ export class Supervisor {
     let denied = 0;
     let failed = 0;
 
+    let tops: Awaited<ReturnType<Venue['tops']>>;
+    try {
+      tops = await venue.tops(tradeable.map((market) => market.marketId));
+    } catch (cause) {
+      this.log({ event: 'tops_failed', error: describe(cause) });
+      return { considered: tradeable.length, submitted: 0, allowed: 0, denied: 0, failed: 1 };
+    }
+
     for (const market of tradeable) {
-      const view = await this.viewOf(market, at);
+      const view = this.viewOf(market, tops.get(market.marketId.toLowerCase()), at);
       if (view === null) continue;
 
       for (const strategy of strategies) {
@@ -128,17 +136,21 @@ export class Supervisor {
     return { considered: tradeable.length, submitted, allowed, denied, failed };
   }
 
-  /** Null when the market cannot be read or is not actually open on-chain. */
-  private async viewOf(market: CanonicalMarket, at: number): Promise<MarketView | null> {
-    let touch: Awaited<ReturnType<Venue['touch']>>;
-    try {
-      touch = await this.options.venue.touch(market.marketId);
-    } catch (cause) {
-      this.log({ event: 'touch_failed', marketId: market.marketId, error: describe(cause) });
-      return null;
-    }
-    // Gotcha 1: the indexer lags, so the chain's status is the gate, not the row.
-    if (touch.status !== STATUS_TRADING) return null;
+  /**
+   * Null when the market has no book to price against.
+   *
+   * There is no on-chain status gate here, and that is deliberate rather than an omission:
+   * `SomniaWriter.placeOrder` reads the chain's own status immediately before signing and
+   * refuses anything not Trading. This decides what to price; that decides what may be sent,
+   * and it is the one that has to be right.
+   */
+  private viewOf(
+    market: CanonicalMarket,
+    top: { bestBidUp: number | null; bestAskUp: number | null; midUp: number | null } | undefined,
+    at: number,
+  ): MarketView | null {
+    if (top === undefined) return null;
+    const touch = top;
 
     const current = touch.midUp ?? touch.bestBidUp ?? touch.bestAskUp;
     if (current === null) return null;

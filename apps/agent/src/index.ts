@@ -1,4 +1,9 @@
-import { LiveAdapter, readLiveTouch } from '@kalibra/adapter-dreamdex';
+import {
+  LiveAdapter,
+  openSomniaSession,
+  readBookTops,
+  type SomniaSession,
+} from '@kalibra/adapter-dreamdex';
 import { z } from 'zod';
 
 import { STRATEGIES } from './strategy.js';
@@ -45,18 +50,41 @@ const adapter = new LiveAdapter({
   includeUntraded: true,
 });
 
+/**
+ * One session for the life of the process, reopened if it dies.
+ *
+ * Opening a client per read is what the one-shot scripts do and it does not survive a loop:
+ * six markets a cycle churned six WebSockets every forty-five seconds until the venue refused
+ * them all, and the failure reads as an outage rather than as this process misbehaving.
+ */
+let session: SomniaSession | null = null;
+
+const sessionClient = async (): Promise<SomniaSession> => {
+  session ??= await openSomniaSession({ indexerUrl: config.DREAMDEX_INDEXER_URL });
+  return session;
+};
+
+const dropSession = async (): Promise<void> => {
+  const dying = session;
+  session = null;
+  // A close that itself fails must not mask the read error that prompted it.
+  if (dying !== null) await dying.close().catch(() => undefined);
+};
+
 const venue: Venue = {
   listMarkets: () => adapter.listMarkets(),
-  touch: async (marketId) => {
-    // The live book from the pool contract, never the reconstruction getQuote returns: that
-    // one is the mid at a past fill, which is what scoring wants and what quoting must not use.
-    const live = await readLiveTouch({ indexerUrl: config.DREAMDEX_INDEXER_URL }, marketId);
-    return {
-      bestBidUp: live.bestBidUp,
-      bestAskUp: live.bestAskUp,
-      midUp: live.midUp,
-      status: live.status,
-    };
+  tops: async (marketIds) => {
+    // The live book, never the reconstruction getQuote returns: that one is the mid at a past
+    // fill, which is what scoring wants and what quoting must not use. One indexer round-trip
+    // for the whole list — the per-market chain version exhausted the socket in minutes.
+    try {
+      return await readBookTops((await sessionClient()).client, marketIds);
+    } catch (cause) {
+      // A dead connection poisons every later read through it, so the session is dropped and
+      // the next cycle opens a fresh one rather than retrying down the same pipe forever.
+      await dropSession();
+      throw cause;
+    }
   },
 };
 
