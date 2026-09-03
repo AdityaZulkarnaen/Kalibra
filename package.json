@@ -28,7 +28,8 @@
     "ingest:watch": "tsx --env-file-if-exists=.env apps/indexer/src/index.ts --watch",
     "agents": "tsx --env-file-if-exists=.env apps/agent/src/index.ts",
     "mcp": "tsx --env-file-if-exists=.env apps/mcp/src/index.ts",
-    "register-agents": "tsx --env-file-if-exists=.env scripts/register-agents.ts"
+    "register-agents": "tsx --env-file-if-exists=.env scripts/register-agents.ts",
+    "collection-status": "tsx --env-file-if-exists=.env scripts/collection-status.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
