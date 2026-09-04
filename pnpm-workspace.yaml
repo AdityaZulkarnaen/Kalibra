@@ -2,8 +2,19 @@ packages:
   - 'packages/*'
   - 'apps/*'
 
+# better-sqlite3 ships a prebuilt binary for every platform this repository runs on, so
+# compiling it from source buys nothing — and costs the entire install on any machine
+# without a full C++ toolchain. pnpm treats an ignored build as an error rather than a
+# warning, so the failure is not cosmetic: `pnpm install` exits 1 and `pnpm test` then
+# refuses to run at all.
+#
+# Found by running the day 8 acceptance criterion for real. A clean clone on a box with
+# VS2019 Build Tools but no Windows SDK failed at `pnpm install` with `true`; with `false`
+# it installs, passes all 431 tests and produces a byte-identical `pnpm demo`. A reviewer's
+# machine is not ours, and "works after you install a compiler" is not what that criterion
+# asks for.
 allowBuilds:
-  better-sqlite3: true
+  better-sqlite3: false
   esbuild: true
 
 minimumReleaseAgeExclude:
