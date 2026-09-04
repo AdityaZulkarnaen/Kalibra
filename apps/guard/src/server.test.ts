@@ -305,6 +305,42 @@ describe('the MCP read routes', () => {
     expect(JSON.parse((await app.inject({ url: '/guard/markets' })).body)).toEqual([]);
   });
 
+  /**
+   * The constraint that actually binds, and the one this filter originally missed. An order
+   * carries an expiry of `now + orderTtlMs` and the pool rejects an expiry past the market's
+   * own, so a market with less time left than the TTL cannot accept an order at all — however
+   * permissive `minTimeToCloseMs` is.
+   *
+   * Found in production, not in review: a market two minutes from close, comfortably past a
+   * five-second `minTimeToCloseMs`, was offered by `list_markets` and then reverted at the
+   * venue against a 120s TTL. `SKILL.md` promises an agent that every market listed is one an
+   * order could be accepted on, and this is what keeps that promise true.
+   */
+  it('drops a market with less time left than an order would live', async () => {
+    const guard = new Guard({
+      db: h.opened.db,
+      adapter: acceptingAdapter(h.replay),
+      policy: policyFor(h, { minTimeToCloseMs: 5_000 }),
+      wallets: new Map([[AGENT, AGENT_WALLET]]),
+      orderTtlMs: 86_400_000,
+    });
+    const app = buildGuardServer({ guard, clock: () => h.now });
+    expect(JSON.parse((await app.inject({ url: '/guard/markets' })).body)).toEqual([]);
+  });
+
+  it('keeps a market whose window outlasts the order TTL', async () => {
+    const guard = new Guard({
+      db: h.opened.db,
+      adapter: acceptingAdapter(h.replay),
+      policy: policyFor(h, { minTimeToCloseMs: 5_000 }),
+      wallets: new Map([[AGENT, AGENT_WALLET]]),
+      orderTtlMs: 1_000,
+    });
+    const app = buildGuardServer({ guard, clock: () => h.now });
+    const body = JSON.parse((await app.inject({ url: '/guard/markets' })).body) as unknown[];
+    expect(body.length).toBeGreaterThan(0);
+  });
+
   it('quotes a market through the adapter Guard already marks positions with', async () => {
     const app = build();
     const response = await app.inject({ url: `/guard/quote/${h.marketId}` });

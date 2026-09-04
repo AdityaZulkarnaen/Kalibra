@@ -60,6 +60,15 @@ export interface GuardOptions {
    * look reasonable, which is what makes it worth guarding against rather than noticing later.
    */
   readonly recordFills?: boolean;
+  /**
+   * How long an order this Guard forwards stays alive, in ms.
+   *
+   * `markets()` needs it, not `submit()`. Every binary order carries a mandatory expiry of
+   * `now + orderTtlMs`, and the pool rejects an expiry beyond the market's own — so a market
+   * with less time left than the TTL cannot accept an order at all, whatever the policy says.
+   * Without this, `list_markets` offers markets that are certain to fail at the venue.
+   */
+  readonly orderTtlMs?: number;
 }
 
 export interface SubmitResult {
@@ -207,17 +216,26 @@ export class Guard {
   /**
    * What this agent may trade, right now.
    *
-   * Open markets intersected with the policy allowlist, minus the ones inside
-   * `minTimeToCloseMs`. Offering a market that `evaluate` would refuse as
-   * TOO_CLOSE_TO_CLOSE or MARKET_NOT_ALLOWED would spend the agent's turn on a certain
-   * denial, which is the same argument `RISK_POLICY_SPEC.md` §7 makes for exposing
-   * remaining headroom rather than only the limits.
+   * Open markets intersected with the policy allowlist, minus the ones too close to close.
+   * Offering a market that `evaluate` would refuse as TOO_CLOSE_TO_CLOSE or
+   * MARKET_NOT_ALLOWED would spend the agent's turn on a certain denial, which is the same
+   * argument `RISK_POLICY_SPEC.md` §7 makes for exposing remaining headroom rather than
+   * only the limits.
+   *
+   * **The binding constraint is the order TTL, not the policy.** Every binary order carries
+   * an expiry of `now + orderTtlMs` and the pool rejects an expiry past the market's own, so
+   * a market with less time left than the TTL cannot accept an order however permissive the
+   * policy is. Found by running it: a market two minutes from close, well past
+   * `minTimeToCloseMs` of five seconds, was offered and then reverted at the venue with
+   * "approve reverted: Missing or invalid parameters" against a 120s TTL. The filter is the
+   * larger of the two, so the promise this tool makes to an agent stays true.
    */
   markets(now: number): PermittedMarket[] {
     const allowed = new Set(this.policy.allowedMarkets);
+    const headroom = Math.max(this.policy.minTimeToCloseMs, this.options.orderTtlMs ?? 0);
     return readOpenMarkets(this.options.db, now)
       .filter((row) => allowed.has(row.marketId))
-      .filter((row) => row.windowEnd - now > this.policy.minTimeToCloseMs)
+      .filter((row) => row.windowEnd - now > headroom)
       .map((row) => ({
         marketId: row.marketId,
         underlying: row.underlying,

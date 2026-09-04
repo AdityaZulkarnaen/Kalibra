@@ -157,8 +157,10 @@ async function main(): Promise<void> {
 
     if (!result.forwarded || result.txHash === null) {
       console.log(`note     ${result.note ?? 'the venue did not accept it'}`);
-      console.log('\nGuard allowed it and the venue did not take it — a thin book, most likely.');
-      console.log('Nothing to claim yet. Try another market or a smaller size.');
+      console.log('\nGuard allowed it and the venue did not take it. The note above is the');
+      console.log('venue speaking; read it rather than assuming a thin book. A revert naming');
+      console.log('parameters usually means the order itself was not acceptable, not that');
+      console.log('nobody was there to trade with. Nothing to claim either way.');
       process.exitCode = 1;
       return;
     }
