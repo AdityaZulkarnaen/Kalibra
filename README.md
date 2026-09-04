@@ -112,8 +112,8 @@ snapshot taken on 3 September and will have grown; the transaction hashes will n
 | Guard policy engine (`packages/core/src/policy.ts`) | SYNTHETIC | All eleven reason codes from `docs/RISK_POLICY_SPEC.md` §4, one test each asserting that code and no other, plus the rule ordering: a killed agent over its daily loss sees `KILL_SWITCH_ACTIVE`. Pure — the clock is an argument. |
 | Guard audit chain (`packages/core/src/audit.ts`) | SYNTHETIC | Keccak-256 over canonical JSON. Verified in both directions: a clean log passes, and insertion, deletion, reordering and a single rewritten field each fail at the right index. Demonstrated against a live SQLite log, below. |
 | Guard transport (`apps/guard`) | **LIVE** | Orders from the demo agents are evaluated by Guard and forwarded to the pool under each agent's own key. Four Guard-forwarded fills are on Shannon, every one status `success`, each sent from the wallet its agent is scored under: [`0x0dec9ecb…`](https://shannon-explorer.somnia.network/tx/0x0dec9ecbb4aae319c8b66cf6c41a5f9ccca4b176899b8872608134cdb1c734a4) (block 478460478), [`0x3c8b17d0…`](https://shannon-explorer.somnia.network/tx/0x3c8b17d0fc6ac66e19f6924c41def312f75bc81bf8e3ffb8b247c89b979690e6), [`0x74c7ccad…`](https://shannon-explorer.somnia.network/tx/0x74c7ccadb1135698b3e8548a4d95ad5ef9326f6746fe25cd32c4aaf60fa6d017), [`0xf6552b9c…`](https://shannon-explorer.somnia.network/tx/0xf6552b9c208cd550a313321a686c8af075097e1cabfe4f0eb609c629d48a2924). Receipts re-checked against the chain, not read back from our own log. |
-| Guard enforcement in the live loop | **LIVE** | 1,178 audit entries from three agents trading the testnet: 608 allowed and 570 refused, across ten of the eleven reason codes — including 63 `ORDER_TOO_LARGE` from `contrarian-fade`, which sizes past the limit on purpose so that the refusals in the log are produced by an agent trading rather than by a script staging them. The eleventh, `RATE_LIMIT_EXCEEDED`, has not been reached: the agents pace themselves below it. |
-| Kalibra Arena (`/v1/arena`) | **LIVE** | The three demo agents registered through the public `POST /v1/arena/register` endpoint — no row was inserted behind it — and are ranked on the same scores their wallets earn on the main leaderboard, verified field by field against `/v1/wallet/:address` by a test. Latest run: `contrarian-fade` and `mid-anchored` both `RANKED` at **0** over 48 and 40 resolved positions from live Shannon fills, `momentum-lean` still `PROVISIONAL` at 14. Zero is the floor of the scale and the agents genuinely earned it — see below for what that turned out to mean. |
+| Guard enforcement in the live loop | **LIVE** | Ten of the eleven reason codes have fired against real orders. A single twelve-hour window on 4 Sep produced 5,119 audit entries — 2,575 allowed, 2,544 refused — including 370 `ORDER_TOO_LARGE` from `contrarian-fade`, which sizes past the limit on purpose so the refusals are produced by an agent trading rather than by a script staging them. The eleventh, `RATE_LIMIT_EXCEEDED`, has never been reached: the agents pace themselves below it. What the refusals correlate with is below. |
+| Kalibra Arena (`/v1/arena`) | **LIVE** | The three demo agents registered through the public `POST /v1/arena/register` endpoint — no row was inserted behind it — and are ranked on the same scores their wallets earn on the main leaderboard, verified field by field against `/v1/wallet/:address` by a test. All three are past the thirty-position minimum: `mid-anchored` `RANKED` **0** at n=170, `contrarian-fade` `RANKED` **0** at n=51, `momentum-lean` `RANKED` **392** at n=49. Two of the three sit on the floor of the scale and genuinely earned it — see below. |
 | MCP server (`apps/mcp`) | SYNTHETIC | A real MCP client connects over the SDK transport and lists exactly the six tools of `docs/RISK_POLICY_SPEC.md` §7, in CI; the stdio entrypoint was additionally driven by hand against the running Guard and listed the same six. No policy-mutation tool exists, asserted by driving every tool and both resources through a recording transport and checking that the only write any of them produced was `POST /guard/order`. **No order has yet been placed through MCP against the live venue** — the tools reach Guard, and Guard's write path is the LIVE row above. |
 | `pnpm demo` | SYNTHETIC | Runs the whole pipeline offline into an in-memory database and asserts the result byte-for-byte against `fixtures/expected/demo-output.json`. |
 
@@ -125,6 +125,11 @@ transaction hashes do not.
 Two of the three agents sit at the floor of the scale. The arithmetic is not in doubt —
 `contrarian-fade` has BSS −0.532, which shrinks to −0.350, giving a raw score of −30 before
 the clamp — but the reason is worth more than the number.
+
+It is no longer a small-sample story either. `mid-anchored` has since reached **n = 170**,
+where shrinkage still passes **87%** of the measured skill through, and it is still 0. The
+agent that sizes by conviction, `momentum-lean`, is the only one of the three with a real
+number: **392** at n = 49.
 
 `mid-anchored` was written to be the control that lands on the 500 anchor by expressing
 almost no view. It scores 0, worse than the agent that deliberately fades the book. Two
@@ -157,6 +162,33 @@ rather than repaired — amending §3.2 would change every score in the system a
 The agent has been left scoring 0, with its `method` string corrected to describe what it
 does and why it fails. Tuning it until it reached 500 would have produced a better-looking
 leaderboard and a worse project.
+
+### Guard throttled the worst agent hardest, without being told which one it was
+
+The policy engine has no access to a score. It sees losses, exposure, order size and the
+clock. Over a twelve-hour window on 4 Sep it nevertheless sorted the three agents by
+quality:
+
+| agent | Kalibra Score | allowed | refused | allow rate |
+|---|---|---|---|---|
+| `momentum-lean` | **392** | 654 | 47 | **93%** |
+| `mid-anchored` | 0 | 1,569 | 1,033 | 60% |
+| `contrarian-fade` | 0 | 352 | 1,464 | **19%** |
+
+The best-scoring agent is barely touched. The worst is refused four times out of five, and
+the reasons say why: 661 `IN_COOLDOWN` from consecutive losses, 409
+`OPEN_NOTIONAL_EXCEEDED` from positions that never came good, 370 `ORDER_TOO_LARGE`.
+
+Two independent measurements of the same behaviour agreeing is the point. Neither mechanism
+knows about the other — `packages/core/src/policy.ts` never reads a score, and
+`packages/core/src/score.ts` never reads a policy.
+
+**Allowed is not filled.** Worth stating because the numbers invite the wrong reading:
+`contrarian-fade` has 352 allowed orders in that window against 81 recorded fills for its
+whole life. Its orders die at the venue, not at Guard — it takes rather than rests, sized up
+to the 50 tUSDC limit, at the extreme prices where a testnet book is thinnest, so there is
+often nothing to cross with. Fills are counted from the chain, never from Guard's own record
+of what it forwarded.
 
 ### These are Event Contracts, not spot
 

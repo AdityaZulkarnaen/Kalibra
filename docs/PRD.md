@@ -242,7 +242,9 @@ discovered ones do.
 
    Measured on the `mid-anchored` demo agent: a two-point intended lean is scored as a
    nineteen-point one, and the agent lands at 0 rather than the 500 it was built to
-   demonstrate. **Sizing by conviction does not fix it.** λ is scale-free — multiplying
+   demonstrate. Confirmed at scale rather than inferred from a short run — it is still 0 at
+   n = 170, where shrinkage passes 87% of the measured skill through, while the one agent
+   that sizes by conviction scores 392. **Sizing by conviction does not fix it.** λ is scale-free — multiplying
    every stake by a constant leaves `stake / p90` unchanged — so only the shape of the
    distribution matters, and against that agent's signal spread linear sizing gives
    λ ≈ 0.245 where flat gives 0.250. Reaching λ ≈ 0 requires a strongly right-skewed stake
