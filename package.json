@@ -21,6 +21,7 @@
     "record": "tsx --env-file-if-exists=.env scripts/record.ts",
     "web": "pnpm --filter @kalibra/web dev",
     "web:build": "pnpm --filter @kalibra/web build",
+    "web:start": "pnpm --filter @kalibra/web start --hostname 127.0.0.1",
     "guard": "tsx --env-file-if-exists=.env apps/guard/src/index.ts",
     "verify-attribution": "tsx --env-file-if-exists=.env scripts/verify-attribution.ts",
     "agent-funding": "tsx --env-file-if-exists=.env scripts/agent-funding.ts",
