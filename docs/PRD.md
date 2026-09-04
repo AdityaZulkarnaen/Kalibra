@@ -244,12 +244,14 @@ discovered ones do.
    nineteen-point one, and the agent lands at 0 rather than the 500 it was built to
    demonstrate. Confirmed at scale rather than inferred from a short run — it is still 0 at
    n = 170, where shrinkage passes 87% of the measured skill through, while the one agent
-   that sizes by conviction scores 392. **Sizing by conviction does not fix it.** λ is scale-free — multiplying
-   every stake by a constant leaves `stake / p90` unchanged — so only the shape of the
-   distribution matters, and against that agent's signal spread linear sizing gives
-   λ ≈ 0.245 where flat gives 0.250. Reaching λ ≈ 0 requires a strongly right-skewed stake
-   distribution: near-nothing usually, occasionally large. That is an aggressive sizing
-   policy rather than the absence of a view.
+   that sizes by conviction scores 392.
+
+   **Sizing by conviction does not fix it.** λ is scale-free — multiplying every stake by a
+   constant leaves `stake / p90` unchanged — so only the shape of the distribution matters,
+   and against that agent's signal spread linear sizing gives λ ≈ 0.245 where flat gives
+   0.250. Reaching λ ≈ 0 requires a strongly right-skewed stake distribution: near-nothing
+   usually, occasionally large. That is an aggressive sizing policy rather than the absence
+   of a view.
 
    The consequence worth stating plainly is that **the scale has no cheap anchor**. A
    trader cannot demonstrate "exactly as good as the market" by declining to express a
