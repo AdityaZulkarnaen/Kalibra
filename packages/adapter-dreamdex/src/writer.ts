@@ -137,6 +137,14 @@ export class SomniaWriter {
       return refused('quantity rounds below the venue lot or minimum');
     }
 
+    // Gotcha 5b: the pool rejects an expiry past the market's own close, and the TTL is a
+    // wall-clock duration that knows nothing about which market it is for. A window with
+    // less time left than the TTL therefore reverts — every time, with a message that names
+    // parameters and not the reason. Clamping here is what makes an order near the close
+    // legal rather than a certain revert.
+    const expireAt = expiryNs(this.config.orderTtlMs ?? DEFAULT_TTL_MS, onchain.expiry);
+    if (expireAt === null) return refused('the market closes before an order could live');
+
     const trader = client.createTrader({ privateKey: this.config.privateKey });
     const result = await trader.placeOrder({
       pool: onchain.pool,
@@ -144,7 +152,7 @@ export class SomniaWriter {
       price: sized.price,
       quantity: sized.quantity,
       orderType: order.postOnly === true ? ORDER_TYPE_POST_ONLY : ORDER_TYPE_IOC,
-      expireTimestampNs: expiryNs(this.config.orderTtlMs ?? DEFAULT_TTL_MS),
+      expireTimestampNs: expireAt,
     });
 
     return {
@@ -220,8 +228,27 @@ function snap(raw: bigint, tickSize: bigint, one: number): bigint | null {
   return snapped < floor ? floor : snapped > ceiling ? ceiling : snapped;
 }
 
-/** Gotcha 5: nanoseconds, in the future, and never 0 — that reverts as already expired. */
-const expiryNs = (ttlMs: number): bigint => BigInt(Date.now() + ttlMs) * 1_000_000n;
+/**
+ * Gotcha 5: nanoseconds, in the future, and never 0 — that reverts as already expired. And
+ * never past the market's own close, which the pool rejects outright.
+ *
+ * `marketExpirySeconds` is the chain's `Trading-close / settlement timestamp`. The result is
+ * held a second inside it, because an expiry landing exactly on the boundary is the one case
+ * where "at or past" and "past" disagree and the pool decides which.
+ *
+ * Null when there is no future left to give the order, which is a refusal rather than a
+ * clamp: sending an already-dead order burns gas to learn what was knowable here.
+ */
+export function expiryNs(
+  ttlMs: number,
+  marketExpirySeconds: bigint,
+  now = Date.now(),
+): bigint | null {
+  const marketCloses = Number(marketExpirySeconds) * 1000 - 1000;
+  const at = Math.min(now + ttlMs, marketCloses);
+  if (at <= now) return null;
+  return BigInt(at) * 1_000_000n;
+}
 
 /** Raised when a write is attempted with no signer configured. */
 export const noSignerError = (clientOrderId: string): UnsupportedOperationError =>

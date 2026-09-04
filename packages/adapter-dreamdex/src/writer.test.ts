@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { CanonicalOrder } from './canonical.js';
-import { quantise } from './writer.js';
+import { expiryNs, quantise } from './writer.js';
 
 /**
  * The conversion from a canonical order to venue units, which is where a stake becomes a
@@ -88,5 +88,44 @@ describe('quantise', () => {
   it('refuses a side whose price is zero, which would divide by nothing', () => {
     expect(quantise(order({ side: 'UP', limitProb: 0 }), DECIMALS, BOOK)).toBeNull();
     expect(quantise(order({ side: 'DOWN', limitProb: 1 }), DECIMALS, BOOK)).toBeNull();
+  });
+});
+
+/**
+ * `SCORING_SPEC.md` has nothing to say here; the pool does. An expiry past the market's own
+ * close is rejected, and the TTL is a wall-clock duration that knows nothing about which
+ * market it is for — so on a short window the two disagree and the order dies.
+ *
+ * Found in production. A market two minutes from close took a 120s TTL and reverted with
+ * "placeBinaryOrder reverted: Missing or invalid parameters", which names a parameter and
+ * not the reason. These tests exist so the next person reads the reason here instead.
+ */
+describe('expiryNs', () => {
+  const NOW = 1_800_000_000_000;
+  const closesAt = (msFromNow: number): bigint => BigInt((NOW + msFromNow) / 1000);
+
+  it('uses the TTL when the window outlasts it', () => {
+    const at = expiryNs(120_000, closesAt(600_000), NOW);
+    expect(at).toBe(BigInt(NOW + 120_000) * 1_000_000n);
+  });
+
+  it('clamps to the market close when the window is shorter than the TTL', () => {
+    const at = expiryNs(120_000, closesAt(30_000), NOW);
+    // A second inside the close: an expiry exactly on the boundary is the one case where
+    // "at or past" and "past" disagree, and the pool decides which.
+    expect(at).toBe(BigInt(NOW + 29_000) * 1_000_000n);
+  });
+
+  it('never returns an expiry at or before now', () => {
+    expect(expiryNs(120_000, closesAt(1_000), NOW)).toBeNull();
+    expect(expiryNs(120_000, closesAt(0), NOW)).toBeNull();
+    expect(expiryNs(120_000, closesAt(-60_000), NOW)).toBeNull();
+  });
+
+  it('is always nanoseconds, never milliseconds', () => {
+    const at = expiryNs(60_000, closesAt(600_000), NOW);
+    expect(at).not.toBeNull();
+    expect((at as bigint) % 1_000_000n).toBe(0n);
+    expect(Number(at) / 1e6).toBeGreaterThan(NOW);
   });
 });

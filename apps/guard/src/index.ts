@@ -17,15 +17,7 @@ const policy = parsePolicy(JSON.parse(readFileSync(config.GUARD_POLICY_PATH, 'ut
 const { db } = openDatabase(config.KALIBRA_DB_PATH);
 const { adapter, adapterFor, wallets, description, recordFills } = await resolveVenue(config);
 
-const guard = new Guard({
-  db,
-  adapter,
-  adapterFor,
-  policy,
-  wallets,
-  recordFills,
-  orderTtlMs: config.GUARD_ORDER_TTL_MS,
-});
+const guard = new Guard({ db, adapter, adapterFor, policy, wallets, recordFills });
 
 const app = buildGuardServer({
   guard,

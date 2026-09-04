@@ -60,15 +60,6 @@ export interface GuardOptions {
    * look reasonable, which is what makes it worth guarding against rather than noticing later.
    */
   readonly recordFills?: boolean;
-  /**
-   * How long an order this Guard forwards stays alive, in ms.
-   *
-   * `markets()` needs it, not `submit()`. Every binary order carries a mandatory expiry of
-   * `now + orderTtlMs`, and the pool rejects an expiry beyond the market's own — so a market
-   * with less time left than the TTL cannot accept an order at all, whatever the policy says.
-   * Without this, `list_markets` offers markets that are certain to fail at the venue.
-   */
-  readonly orderTtlMs?: number;
 }
 
 export interface SubmitResult {
@@ -222,20 +213,18 @@ export class Guard {
    * argument `RISK_POLICY_SPEC.md` §7 makes for exposing remaining headroom rather than
    * only the limits.
    *
-   * **The binding constraint is the order TTL, not the policy.** Every binary order carries
-   * an expiry of `now + orderTtlMs` and the pool rejects an expiry past the market's own, so
-   * a market with less time left than the TTL cannot accept an order however permissive the
-   * policy is. Found by running it: a market two minutes from close, well past
-   * `minTimeToCloseMs` of five seconds, was offered and then reverted at the venue with
-   * "approve reverted: Missing or invalid parameters" against a 120s TTL. The filter is the
-   * larger of the two, so the promise this tool makes to an agent stays true.
+   * `minTimeToCloseMs` is the whole filter, and briefly was not. An order's expiry of
+   * `now + orderTtlMs` used to be able to land past the market's own close, which the pool
+   * rejects, so this filter was widened to the larger of the two — and then offered almost
+   * nothing, because the supervisor allowlists the markets nearest to closing. The expiry is
+   * now clamped where it is built (`writer.ts`), so a short window takes a short-lived order
+   * instead of a doomed one, and the operator's knob is the only limit again.
    */
   markets(now: number): PermittedMarket[] {
     const allowed = new Set(this.policy.allowedMarkets);
-    const headroom = Math.max(this.policy.minTimeToCloseMs, this.options.orderTtlMs ?? 0);
     return readOpenMarkets(this.options.db, now)
       .filter((row) => allowed.has(row.marketId))
-      .filter((row) => row.windowEnd - now > headroom)
+      .filter((row) => row.windowEnd - now > this.policy.minTimeToCloseMs)
       .map((row) => ({
         marketId: row.marketId,
         underlying: row.underlying,
