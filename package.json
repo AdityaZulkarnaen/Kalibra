@@ -29,7 +29,8 @@
     "agents": "tsx --env-file-if-exists=.env apps/agent/src/index.ts",
     "mcp": "tsx --env-file-if-exists=.env apps/mcp/src/index.ts",
     "register-agents": "tsx --env-file-if-exists=.env scripts/register-agents.ts",
-    "collection-status": "tsx --env-file-if-exists=.env scripts/collection-status.ts"
+    "collection-status": "tsx --env-file-if-exists=.env scripts/collection-status.ts",
+    "mcp-place-one": "tsx --env-file-if-exists=.env scripts/mcp-place-one.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -60,7 +61,8 @@
     "fastify": "^5.12.1",
     "zod": "^4.5.4",
     "@kalibra/agent": "workspace:*",
-    "@kalibra/mcp": "workspace:*"
+    "@kalibra/mcp": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.30.0"
   },
   "packageManager": "pnpm@11.24.0"
 }

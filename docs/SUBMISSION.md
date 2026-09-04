@@ -3,7 +3,7 @@
 **Hackathon:** Somnia × DreamDEX Event Contracts Hackathon, hosted on DoraHacks
 **Prize pool:** $5,000 USDso
 **Window:** 25 August – 9 September 2026
-**Target submission date:** 8 September
+**Target submission date:** 6 September
 
 ---
 

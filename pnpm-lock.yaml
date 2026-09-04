@@ -32,6 +32,9 @@ importers:
       '@kalibra/mcp':
         specifier: workspace:*
         version: link:apps/mcp
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.30.0
+        version: 1.30.0(zod@4.5.4)
       '@noble/hashes':
         specifier: ^2.4.0
         version: 2.4.0
