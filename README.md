@@ -93,9 +93,9 @@ Somnia interaction with a transaction hash or a captured response in `fixtures/`
 `REPLAY` means recorded real data; `SYNTHETIC` means generated data with the real
 integration unverified; `STUB` means the interface exists and the implementation does not.
 
-**As of day 7 of nine, complete (`docs/BUILD_PLAN.md`).** Five rows below are `LIVE`; the
-rest run on generated data. The agents are still trading, so the counts in those rows are a
-snapshot taken on 3 September and will have grown; the transaction hashes will not.
+**As of day 8 of nine, complete (`docs/BUILD_PLAN.md`).** Five rows below are `LIVE`; the
+rest run on generated data. The agents are still collecting, so every count in those rows is
+a snapshot taken on 4 September and will have grown since; the transaction hashes will not.
 
 | Component | Status | Evidence |
 |---|---|---|
