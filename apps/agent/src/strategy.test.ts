@@ -69,10 +69,37 @@ describe('every strategy', () => {
 });
 
 describe('mid-anchored', () => {
-  it('stays within two points of the market, because it claims no view', () => {
+  it('states a forecast within two points of the market', () => {
     const intent = midAnchored.decide(view());
     expect(intent).not.toBeNull();
     expect(Math.abs((intent?.forecast ?? 0) - 0.6)).toBeCloseTo(0.02, 6);
+  });
+
+  /**
+   * The claim its `method` string makes, pinned. It reads best bid and ask *prices* and never
+   * sizes, so it cannot lean toward thin liquidity however it is described — the old test
+   * `bestBidUp < 1 - bestAskUp` is `mid < 0.5` rearranged. The live data agreed before this
+   * was written: all 25 of its DOWN positions sat at `p > 0.5`, none anywhere else.
+   */
+  it('leans toward even odds, not toward book depth', () => {
+    for (const mid of [0.1, 0.3, 0.45]) {
+      expect(midAnchored.decide(view({ midUp: mid, bestBidUp: mid, bestAskUp: mid }))?.side).toBe(
+        'UP',
+      );
+    }
+    for (const mid of [0.55, 0.7, 0.9]) {
+      expect(midAnchored.decide(view({ midUp: mid, bestBidUp: mid, bestAskUp: mid }))?.side).toBe(
+        'DOWN',
+      );
+    }
+  });
+
+  /** A lopsided book does not move it, which is the same claim seen from the other side. */
+  it('ignores how far apart the two sides of the book are', () => {
+    const wide = midAnchored.decide(view({ midUp: 0.7, bestBidUp: 0.4, bestAskUp: 1.0 }));
+    const tight = midAnchored.decide(view({ midUp: 0.7, bestBidUp: 0.69, bestAskUp: 0.71 }));
+    expect(wide?.side).toBe(tight?.side);
+    expect(wide?.stake).toBe(tight?.stake);
   });
 
   it('rests rather than takes, so it pays no spread it does not have to', () => {

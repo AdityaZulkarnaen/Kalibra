@@ -233,9 +233,30 @@ discovered ones do.
 2. **The conviction model is a model.** Mapping position size to forecast confidence
    (`SCORING_SPEC.md` §3.2) is a defensible choice, not a ground truth. Different λ
    produces different scores. The parameter is documented and configurable.
-3. **Short history.** Scores computed over a hackathon-length window have wide confidence
+3. **A flat staker is scored as maximally convicted, on every position.** λ is measured
+   against the wallet's *own* trailing p90 stake, so a trader who bets one size every time
+   has a p90 equal to that size and receives near-maximum λ throughout. §3.2 anticipates
+   this for a wallet's *first* position and argues shrinkage makes it harmless; that
+   argument does not extend to a wallet where it holds for every position, because
+   shrinkage moves a uniformly bad BSS toward the anchor only slowly.
+
+   Measured on the `mid-anchored` demo agent: a two-point intended lean is scored as a
+   nineteen-point one, and the agent lands at 0 rather than the 500 it was built to
+   demonstrate. **Sizing by conviction does not fix it.** λ is scale-free — multiplying
+   every stake by a constant leaves `stake / p90` unchanged — so only the shape of the
+   distribution matters, and against that agent's signal spread linear sizing gives
+   λ ≈ 0.245 where flat gives 0.250. Reaching λ ≈ 0 requires a strongly right-skewed stake
+   distribution: near-nothing usually, occasionally large. That is an aggressive sizing
+   policy rather than the absence of a view.
+
+   The consequence worth stating plainly is that **the scale has no cheap anchor**. A
+   trader cannot demonstrate "exactly as good as the market" by declining to express a
+   view, because the metric reads their sizing, not their restraint. Left as a limitation
+   rather than repaired: changing §3.2 would change every score in the system and require a
+   `params_hash` bump, and the choice belongs to whoever owns the metric.
+4. **Short history.** Scores computed over a hackathon-length window have wide confidence
    intervals. The `PROVISIONAL` status and displayed sample size make this visible.
-4. **Settlement trust.** Kalibra reads outcomes from DreamDEX settlement. It does not
+5. **Settlement trust.** Kalibra reads outcomes from DreamDEX settlement. It does not
    independently verify that settlement was correct.
-5. **Testnet Only.** The current deployment operates on testnet. While the core logic and scoring
+6. **Testnet Only.** The current deployment operates on testnet. While the core logic and scoring
   mechanics are fully functional, user behavior without real economic stakes may not perfectly mirror mainnet dynamics. Formal security audits and mainnet deployment represent the next phase of development.

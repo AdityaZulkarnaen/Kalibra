@@ -67,32 +67,52 @@ function marketProb(view: MarketView): number | null {
 }
 
 /**
- * Quotes both sides around the market's own mid and leans by a fixed amount toward whichever
- * side the book is thinner on.
+ * Takes the market mid and leans two points back toward even odds.
  *
- * Deliberately the dullest of the three. It expresses almost no view, so over enough resolved
- * positions it should score near the anchor of 500 — which is what the scale means, and having
- * one agent land there on purpose is worth more than three agents all claiming an edge.
+ * It was written to be the control that lands on the 500 anchor, and it does not — it scores
+ * near zero. Both halves of that intention turned out to be wrong, and the correction is left
+ * visible here because it is the most instructive thing the three agents produced.
+ *
+ * **It cannot see book depth.** `MarketView` carries best bid and ask *prices*, never sizes.
+ * The old "thinner side of the book" test read `bestBidUp < 1 - bestAskUp`, which reduces to
+ * `mid < 0.5` — so it was leaning toward even odds, not toward thin liquidity. Confirmed in
+ * the live data: all 25 of its DOWN positions were taken at `p > 0.5`, without exception.
+ *
+ * **A flat staker cannot express low conviction.** `SCORING_SPEC.md` §3.2 sets
+ * `λ = LAMBDA_MAX × stake / p90(that wallet's own trailing stakes)`, so conviction is measured
+ * against the wallet's own history. Stake the same size every time and the p90 is that size,
+ * which reads as full conviction on every position: measured λ here runs 0.125 to 0.500, and a
+ * two-point intended lean is scored as a nineteen-point one.
+ *
+ * Sizing by conviction does not fix it, which is the part worth knowing. λ is scale-free —
+ * multiplying every stake by a constant leaves `stake / p90` unchanged — so only the *shape*
+ * of the distribution moves it. Against this agent's own signal spread, linear sizing gives
+ * λ ≈ 0.245 where flat gives 0.250. Reaching λ ≈ 0 needs a strongly right-skewed stake
+ * distribution: near-nothing most of the time, occasionally large. That is an aggressive
+ * sizing policy, not the absence of a view, so there is no honest way to build the intended
+ * control out of this agent. See `docs/PRD.md` §9.
  */
 export const midAnchored: Strategy = {
   agentId: 'mid-anchored',
   name: 'Mid Anchored',
   method:
-    'Takes the market mid as its forecast and leans two points toward the thinner side of ' +
-    'the book. Expresses almost no independent view, so it should score near 500 — the ' +
-    'anchor meaning "exactly as good as the market". It is the control, not a contender.',
+    'Takes the market mid and leans two points back toward even odds — it has no depth data, ' +
+    'so this is weak mean reversion and nothing more. Flat two-tUSDC stake, which is why it ' +
+    'scores badly: conviction is measured against a wallet own stake history, so betting one ' +
+    'size every time reads as maximum conviction on every position and turns a two-point lean ' +
+    'into a nineteen-point one. Kept as the worked example of that trap, not as a contender.',
   decide(view) {
     const p = marketProb(view);
     if (p === null) return null;
-    const thinnerIsUp =
-      view.bestAskUp === null || (view.bestBidUp ?? 0) < 1 - (view.bestAskUp ?? 1);
-    const forecast = clamp(p + (thinnerIsUp ? 0.02 : -0.02));
+    // Named for what it measures. This is `mid < 0.5`, not a depth comparison.
+    const belowEven = view.bestAskUp === null || (view.bestBidUp ?? 0) < 1 - (view.bestAskUp ?? 1);
+    const forecast = clamp(p + (belowEven ? 0.02 : -0.02));
     return {
       side: forecast >= p ? 'UP' : 'DOWN',
       forecast,
       stake: 2n * USDC,
       postOnly: true,
-      rationale: `mid ${p.toFixed(3)}, leaning to ${thinnerIsUp ? 'UP' : 'DOWN'}`,
+      rationale: `mid ${p.toFixed(3)}, leaning toward even (${belowEven ? 'UP' : 'DOWN'})`,
     };
   },
 };

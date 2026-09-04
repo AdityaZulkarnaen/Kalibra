@@ -112,13 +112,51 @@ snapshot taken on 3 September and will have grown; the transaction hashes will n
 | Guard policy engine (`packages/core/src/policy.ts`) | SYNTHETIC | All eleven reason codes from `docs/RISK_POLICY_SPEC.md` §4, one test each asserting that code and no other, plus the rule ordering: a killed agent over its daily loss sees `KILL_SWITCH_ACTIVE`. Pure — the clock is an argument. |
 | Guard audit chain (`packages/core/src/audit.ts`) | SYNTHETIC | Keccak-256 over canonical JSON. Verified in both directions: a clean log passes, and insertion, deletion, reordering and a single rewritten field each fail at the right index. Demonstrated against a live SQLite log, below. |
 | Guard transport (`apps/guard`) | **LIVE** | Orders from the demo agents are evaluated by Guard and forwarded to the pool under each agent's own key. Four Guard-forwarded fills are on Shannon, every one status `success`, each sent from the wallet its agent is scored under: [`0x0dec9ecb…`](https://shannon-explorer.somnia.network/tx/0x0dec9ecbb4aae319c8b66cf6c41a5f9ccca4b176899b8872608134cdb1c734a4) (block 478460478), [`0x3c8b17d0…`](https://shannon-explorer.somnia.network/tx/0x3c8b17d0fc6ac66e19f6924c41def312f75bc81bf8e3ffb8b247c89b979690e6), [`0x74c7ccad…`](https://shannon-explorer.somnia.network/tx/0x74c7ccadb1135698b3e8548a4d95ad5ef9326f6746fe25cd32c4aaf60fa6d017), [`0xf6552b9c…`](https://shannon-explorer.somnia.network/tx/0xf6552b9c208cd550a313321a686c8af075097e1cabfe4f0eb609c629d48a2924). Receipts re-checked against the chain, not read back from our own log. |
-| Guard enforcement in the live loop | **LIVE** | 812 audit entries from three agents trading the testnet, 3 Sep: 391 allowed and 421 refused, across ten of the eleven reason codes — including 43 `ORDER_TOO_LARGE` from `contrarian-fade`, which sizes past the limit on purpose so that the refusals in the log are produced by an agent trading rather than by a script staging them. The eleventh, `RATE_LIMIT_EXCEEDED`, has not been reached: the agents pace themselves below it. |
-| Kalibra Arena (`/v1/arena`) | **LIVE** | The three demo agents registered through the public `POST /v1/arena/register` endpoint — no row was inserted behind it — and are ranked on the same scores their wallets earn on the main leaderboard, verified field by field against `/v1/wallet/:address` by a test. On 3 Sep `contrarian-fade` was `RANKED` at 148 over 36 resolved positions from live Shannon fills, and the other two were `PROVISIONAL`, showing a sample count rather than a number. 148 is well below 500, which says that agent's deviations from market price were worse than noise — that is what the data says, and it is reported rather than tuned away. |
+| Guard enforcement in the live loop | **LIVE** | 1,178 audit entries from three agents trading the testnet: 608 allowed and 570 refused, across ten of the eleven reason codes — including 63 `ORDER_TOO_LARGE` from `contrarian-fade`, which sizes past the limit on purpose so that the refusals in the log are produced by an agent trading rather than by a script staging them. The eleventh, `RATE_LIMIT_EXCEEDED`, has not been reached: the agents pace themselves below it. |
+| Kalibra Arena (`/v1/arena`) | **LIVE** | The three demo agents registered through the public `POST /v1/arena/register` endpoint — no row was inserted behind it — and are ranked on the same scores their wallets earn on the main leaderboard, verified field by field against `/v1/wallet/:address` by a test. Latest run: `contrarian-fade` and `mid-anchored` both `RANKED` at **0** over 48 and 40 resolved positions from live Shannon fills, `momentum-lean` still `PROVISIONAL` at 14. Zero is the floor of the scale and the agents genuinely earned it — see below for what that turned out to mean. |
 | MCP server (`apps/mcp`) | SYNTHETIC | A real MCP client connects over the SDK transport and lists exactly the six tools of `docs/RISK_POLICY_SPEC.md` §7, in CI; the stdio entrypoint was additionally driven by hand against the running Guard and listed the same six. No policy-mutation tool exists, asserted by driving every tool and both resources through a recording transport and checking that the only write any of them produced was `POST /guard/order`. **No order has yet been placed through MCP against the live venue** — the tools reach Guard, and Guard's write path is the LIVE row above. |
 | `pnpm demo` | SYNTHETIC | Runs the whole pipeline offline into an in-memory database and asserts the result byte-for-byte against `fixtures/expected/demo-output.json`. |
 
 Rows are added as components land. The Arena numbers move as more windows settle; the
 transaction hashes do not.
+
+### The demo agents scored 0, and that is the most useful thing they produced
+
+Two of the three agents sit at the floor of the scale. The arithmetic is not in doubt —
+`contrarian-fade` has BSS −0.532, which shrinks to −0.350, giving a raw score of −30 before
+the clamp — but the reason is worth more than the number.
+
+`mid-anchored` was written to be the control that lands on the 500 anchor by expressing
+almost no view. It scores 0, worse than the agent that deliberately fades the book. Two
+separate mistakes, both of which survived code review and were caught only by running it:
+
+**It cannot see book depth.** Its `method` string claimed it leaned "toward the thinner side
+of the book". The strategy receives best bid and ask *prices* and never sizes, and the test
+it actually performed — `bestBidUp < 1 − bestAskUp` — rearranges to `mid < 0.5`. It was
+leaning toward even odds. The live data agrees without exception: all 25 of its DOWN
+positions were taken at `p > 0.5`.
+
+**A flat staker is read as maximally convicted.** `SCORING_SPEC.md` §3.2 measures conviction
+as `λ = LAMBDA_MAX × stake / p90(that wallet's own trailing stakes)`. Bet one size every time
+and your own p90 *is* that size, so every position reads as full conviction — measured λ ran
+0.125 to 0.500, and a two-point intended lean was scored as a nineteen-point one.
+
+The second one has a sting: **sizing by conviction does not fix it.** λ is scale-free, so
+multiplying every stake by a constant leaves `stake / p90` untouched and only the shape of the
+distribution moves it. Against this agent's own signal spread, linear conviction sizing gives
+λ ≈ 0.245 where flat staking gives 0.250 — no material change. Reaching λ ≈ 0 needs a strongly
+right-skewed stake distribution, near-nothing usually and occasionally large, which is an
+aggressive sizing policy rather than the absence of a view.
+
+So **the scale has no cheap anchor**: a trader cannot demonstrate "exactly as good as the
+market" by declining to express one, because the metric reads their sizing and not their
+restraint. That is a real limitation of the conviction model, recorded as `PRD.md` §9 item 3
+rather than repaired — amending §3.2 would change every score in the system and needs a
+`params_hash` bump, and that choice belongs to whoever owns the metric.
+
+The agent has been left scoring 0, with its `method` string corrected to describe what it
+does and why it fails. Tuning it until it reached 500 would have produced a better-looking
+leaderboard and a worse project.
 
 ### These are Event Contracts, not spot
 
