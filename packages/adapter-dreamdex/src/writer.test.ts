@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { CanonicalOrder } from './canonical.js';
-import { expiryNs, quantise } from './writer.js';
+import { expiryNs, quantise, serialise } from './writer.js';
 
 /**
  * The conversion from a canonical order to venue units, which is where a stake becomes a
@@ -127,5 +127,63 @@ describe('expiryNs', () => {
     expect(at).not.toBeNull();
     expect((at as bigint) % 1_000_000n).toBe(0n);
     expect(Number(at) / 1e6).toBeGreaterThan(NOW);
+  });
+});
+
+/**
+ * Two transactions from one address in flight together race for the same nonce, and the
+ * venue reports the loser as a revert that reads like a malformed order. The demo agents
+ * never trip it — a cycle walks its markets in order and the three strategies sign with
+ * different keys — so it only appears once a second caller shares a signer, which is what
+ * the MCP surface exists to allow.
+ */
+describe('serialise', () => {
+  const holder = (): { queue: Promise<unknown> } => ({ queue: Promise.resolve() });
+  const defer = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+  it('never lets two pieces of work overlap', async () => {
+    const h = holder();
+    const events: string[] = [];
+    const work = (name: string, ms: number) => async (): Promise<string> => {
+      events.push(`${name}:start`);
+      await defer(ms);
+      events.push(`${name}:end`);
+      return name;
+    };
+
+    // The slow one is queued first, so a racing implementation interleaves and this fails.
+    const [a, b] = await Promise.all([serialise(h, work('a', 30)), serialise(h, work('b', 1))]);
+
+    expect([a, b]).toEqual(['a', 'b']);
+    expect(events).toEqual(['a:start', 'a:end', 'b:start', 'b:end']);
+  });
+
+  it('runs work in the order it was queued', async () => {
+    const h = holder();
+    const seen: number[] = [];
+    await Promise.all(
+      [0, 1, 2, 3].map((i) =>
+        serialise(h, async () => {
+          await defer(4 - i);
+          seen.push(i);
+        }),
+      ),
+    );
+    expect(seen).toEqual([0, 1, 2, 3]);
+  });
+
+  /** The next order is a different order and has done nothing wrong. */
+  it('keeps going after one piece of work rejects', async () => {
+    const h = holder();
+    await expect(serialise(h, () => Promise.reject(new Error('venue said no')))).rejects.toThrow(
+      'venue said no',
+    );
+    await expect(serialise(h, () => Promise.resolve('next'))).resolves.toBe('next');
+  });
+
+  it('does not retain the result of finished work', async () => {
+    const h = holder();
+    await serialise(h, () => Promise.resolve({ big: 'payload' }));
+    await expect(h.queue).resolves.toBeUndefined();
   });
 });

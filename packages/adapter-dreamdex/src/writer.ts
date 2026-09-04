@@ -83,6 +83,24 @@ export class SomniaWriter {
    */
   private session: SomniaSession | null = null;
 
+  /**
+   * One order at a time, per signer.
+   *
+   * Every write from this instance signs with one key, and two transactions from one address
+   * in flight together race for the same nonce. The venue reports the loser as a revert
+   * reading "Missing or invalid parameters" — sometimes at the approve, sometimes at the
+   * order, depending where the collision lands — which reads as a malformed order and is not
+   * one.
+   *
+   * The demo agents alone never hit it: a cycle walks its markets sequentially and the three
+   * strategies sign with different keys. It appears the moment a *second* caller shares a
+   * signer, which is exactly what the MCP surface is for — an outside agent placing an order
+   * while the loop is mid-cycle. Serialising here rather than in Guard means every caller
+   * gets it, including ones written later by someone else.
+   */
+  /** Not private: `serialise` below advances it. Nothing outside this file touches it. */
+  queue: Promise<unknown> = Promise.resolve();
+
   constructor(private readonly config: WriterConfig) {}
 
   /** Releases the connection. A caller that forgets leaves the process alive. */
@@ -102,8 +120,11 @@ export class SomniaWriter {
    */
   async placeOrder(order: CanonicalOrder): Promise<CanonicalOrderResult> {
     try {
+      // The deadline covers the wait for the queue as well as the send. A caller must not
+      // block for ever because somebody ahead of it is slow — that would turn one wedged
+      // order into a stalled agent.
       return await withDeadline(
-        this.send(order),
+        serialise(this, () => this.send(order)),
         this.config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
         `placing ${order.clientOrderId}`,
       );
@@ -162,6 +183,25 @@ export class SomniaWriter {
       rejectReason: null,
     };
   }
+}
+
+/**
+ * Runs `work` after everything already queued on `holder`, whatever those did.
+ *
+ * A rejection must not break the chain: the next caller is a different order and has done
+ * nothing wrong. Results are not retained either, so a long-lived writer does not hold every
+ * order it ever placed alive through its own queue.
+ */
+export function serialise<T>(
+  holder: { queue: Promise<unknown> },
+  work: () => Promise<T>,
+): Promise<T> {
+  const next = holder.queue.then(work, work);
+  holder.queue = next.then(
+    () => undefined,
+    () => undefined,
+  );
+  return next;
 }
 
 /** A revert is the venue answering, so the connection is fine and worth keeping. */
