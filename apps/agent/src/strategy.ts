@@ -98,9 +98,9 @@ export const midAnchored: Strategy = {
   method:
     'Takes the market mid and leans two points back toward even odds — it has no depth data, ' +
     'so this is weak mean reversion and nothing more. Flat two-tUSDC stake, which is why it ' +
-    'scores badly: conviction is measured against a wallet own stake history, so betting one ' +
-    'size every time reads as maximum conviction on every position and turns a two-point lean ' +
-    'into a nineteen-point one. Kept as the worked example of that trap, not as a contender.',
+    'scores badly: conviction is measured against a wallet’s own stake history, so betting ' +
+    'one size every time reads as maximum conviction on every position and turns a two-point ' +
+    'lean into a nineteen-point one. Kept as the worked example of that trap, not a contender.',
   decide(view) {
     const p = marketProb(view);
     if (p === null) return null;
