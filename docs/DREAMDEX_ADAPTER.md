@@ -252,7 +252,7 @@ only. The source column names GraphQL fields on the indexer at
 | `CanonicalSettlement.outcome` | `Market.voided`, `Market.winningOutcome` (0 = YES) | voided → VOID, 0 → UP, 1 → DOWN | ☑ **traced**, §6.1 |
 | `CanonicalSettlement.settledAt` | `Market.resolvedAtTimestamp`, seconds | × 1000 | ☑ |
 | `CanonicalQuote.midUp` | derived from `Order` rows: `price`, `side`, `rested`, `quantityRemaining`, `placedAtBlock`, `lastUpdatedAtBlock` | reconstruct at block − 1; see 7.2 | ☑ |
-| `CanonicalOrder` → venue request | `exchange.createOrder(symbol, 'limit', side, qty, price)` | quantise to tick and lot first | ☐ |
+| `CanonicalOrder` → venue request | `trader.placeOrder({ pool, side, price, quantity, orderType, expireTimestampNs })` on the SDK's trader | quantise to the pool's tick and lot first, and clamp the expiry to market close; `packages/adapter-dreamdex/src/writer.ts` | ☑ **landed on chain**, see the `LIVE` write rows in the README |
 
 ### 6.1 Verified end to end — side attribution, 2 Sep 2026
 
