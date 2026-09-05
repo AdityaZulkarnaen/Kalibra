@@ -1,0 +1,68 @@
+{
+  "window": {
+    "from": "2026-09-03T07:00:46.710000Z",
+    "to": "2026-09-03T13:39:48.500000Z",
+    "entries": 1178
+  },
+  "source": "audit_log of the local kalibra.db, written by apps/guard during a live agent run",
+  "totals": {
+    "allowed": 608,
+    "refused": 570
+  },
+  "byAgent": {
+    "contrarian-fade": {
+      "allowed": 173,
+      "refused": 260,
+      "allowRate": 0.3995,
+      "reasonCodes": {
+        "IN_COOLDOWN": 103,
+        "ORDER_TOO_LARGE": 63,
+        "UPSTREAM_UNAVAILABLE": 21,
+        "OPEN_NOTIONAL_EXCEEDED": 17,
+        "KILL_SWITCH_ACTIVE": 17,
+        "MARKET_NOT_OPEN": 15,
+        "DAILY_LOSS_EXCEEDED": 15,
+        "TOO_CLOSE_TO_CLOSE": 7,
+        "MARKET_NOT_ALLOWED": 2
+      }
+    },
+    "mid-anchored": {
+      "allowed": 339,
+      "refused": 289,
+      "allowRate": 0.5398,
+      "reasonCodes": {
+        "IN_COOLDOWN": 175,
+        "UPSTREAM_UNAVAILABLE": 40,
+        "MARKET_NOT_OPEN": 38,
+        "KILL_SWITCH_ACTIVE": 20,
+        "MARKET_NOT_ALLOWED": 9,
+        "TOO_CLOSE_TO_CLOSE": 6,
+        "INVALID_ORDER": 1
+      }
+    },
+    "momentum-lean": {
+      "allowed": 96,
+      "refused": 21,
+      "allowRate": 0.8205,
+      "reasonCodes": {
+        "KILL_SWITCH_ACTIVE": 8,
+        "UPSTREAM_UNAVAILABLE": 5,
+        "IN_COOLDOWN": 5,
+        "TOO_CLOSE_TO_CLOSE": 2,
+        "MARKET_NOT_ALLOWED": 1
+      }
+    }
+  },
+  "distinctReasonCodes": [
+    "DAILY_LOSS_EXCEEDED",
+    "INVALID_ORDER",
+    "IN_COOLDOWN",
+    "KILL_SWITCH_ACTIVE",
+    "MARKET_NOT_ALLOWED",
+    "MARKET_NOT_OPEN",
+    "OPEN_NOTIONAL_EXCEEDED",
+    "ORDER_TOO_LARGE",
+    "TOO_CLOSE_TO_CLOSE",
+    "UPSTREAM_UNAVAILABLE"
+  ]
+}
