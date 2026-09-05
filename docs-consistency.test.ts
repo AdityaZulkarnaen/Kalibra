@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -98,8 +98,105 @@ describe('the real-vs-mocked table', () => {
     expect(live.length).toBeGreaterThan(0);
     for (const row of live) {
       const component = row.split('|')[1]?.trim() ?? row;
-      const evidence = /0x[0-9a-f]{16}|fixtures\/recorded\/|below/iu.test(row);
+      const evidence = /0x[0-9a-f]{16}|fixtures\/recorded\//iu.test(row);
       expect(evidence, `LIVE row "${component}" cites no hash or fixture`).toBe(true);
+    }
+  });
+});
+
+/**
+ * The ten real ranked wallets are quoted in prose, and prose about live data goes stale the
+ * moment another window settles. The numbers were already wrong once between capturing the
+ * snapshot and writing the table, which is the whole argument for checking them: a figure a
+ * reader can verify against committed bytes is evidence, and the same figure drifting quietly
+ * is the discovered overclaiming `CLAUDE.md` §6 calls fatal.
+ *
+ * So the table is compared against the capture it cites. Updating one without the other fails
+ * here rather than in front of a judge.
+ */
+describe('the ten real ranked wallets', () => {
+  const CAPTURE = 'fixtures/recorded/live-index-2026-09-05/leaderboard-ranked.json';
+
+  /** Every `| 0x… | score | n |` row of the section, as the README writes them. */
+  async function readmeWallets(): Promise<Map<string, [number, number]>> {
+    const readme = await read('README.md');
+    const start = readme.indexOf('### The ten real ranked wallets');
+    expect(start, 'the real-wallet table is missing from README.md').toBeGreaterThan(-1);
+
+    const section = readme.slice(start, readme.indexOf('###', start + 10));
+    const rows = [...section.matchAll(/\|\s*`(0x[0-9a-f]{40})`\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|/gu)];
+    return new Map(rows.map((m) => [m[1]!, [Number(m[2]), Number(m[3])]]));
+  }
+
+  /** The ranked entries of the capture whose address is not from the synthetic fixture set. */
+  async function capturedWallets(): Promise<Map<string, [number, number]>> {
+    const body: unknown = JSON.parse(await read(CAPTURE));
+    const entries = (body as { entries?: Array<Record<string, unknown>> }).entries ?? [];
+    return new Map(
+      entries
+        .filter((entry) => !String(entry.wallet).startsWith('0x0000000000000000'))
+        .map((entry) => [String(entry.wallet), [Number(entry.score), Number(entry.n)]]),
+    );
+  }
+
+  it('quotes the score and sample size the committed capture carries', async () => {
+    expect(await readmeWallets()).toEqual(await capturedWallets());
+  });
+
+  it('accounts for every real wallet in the capture, so none was quietly dropped', async () => {
+    const captured = await capturedWallets();
+    expect(captured.size).toBe(10);
+    expect([...(await readmeWallets()).keys()].sort()).toEqual([...captured.keys()].sort());
+  });
+});
+
+/**
+ * `CLAUDE.md` §6 forbids a `LIVE` row without a transaction hash or a captured response. The
+ * hashes were present from the start; the receipts were not, so for several days the strongest
+ * claims in the README were the only ones a reader had to leave the repository to check.
+ *
+ * Now that they are committed, this asserts the two agree. A hash edited in the README without
+ * its receipt, or a receipt swapped for a different transaction, fails here.
+ */
+describe('the committed chain receipts', () => {
+  const DIR = 'fixtures/recorded/chain-receipts-2026-09-05';
+
+  interface Receipt {
+    readonly hash: string;
+    readonly status: string;
+    readonly block_number: number;
+  }
+
+  async function receipts(): Promise<Receipt[]> {
+    const names = (await readdir(join(ROOT, DIR))).filter((name) => name.endsWith('.json'));
+    return Promise.all(
+      names.map(async (name) => JSON.parse(await read(`${DIR}/${name}`)) as Receipt),
+    );
+  }
+
+  it('records a successful transaction for every receipt', async () => {
+    const all = await receipts();
+    expect(all).toHaveLength(5);
+    for (const receipt of all) {
+      expect(receipt.status, `${receipt.hash} did not succeed`).toBe('ok');
+    }
+  });
+
+  it('carries a hash the README actually cites', async () => {
+    const readme = await read('README.md');
+    for (const receipt of await receipts()) {
+      // The README abbreviates hashes in link text but spells them out in the explorer href.
+      expect(readme, `no README reference to ${receipt.hash}`).toContain(receipt.hash);
+    }
+  });
+
+  it('agrees with the block number the README prints beside it', async () => {
+    const readme = await read('README.md');
+    for (const receipt of await receipts()) {
+      expect(
+        readme,
+        `README does not print block ${receipt.block_number} for ${receipt.hash}`,
+      ).toContain(String(receipt.block_number));
     }
   });
 });

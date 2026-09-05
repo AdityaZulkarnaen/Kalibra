@@ -12,6 +12,16 @@ reputation.
 
 Built for the **Somnia × DreamDEX Event Contracts Hackathon** (25 Aug – 9 Sep 2026).
 
+**Live: [kalibra-frontend.vercel.app](https://kalibra-frontend.vercel.app/)** — running
+`KALIBRA_MODE=live` against Somnia Shannon testnet and still ingesting.
+
+**Read this before quoting a rank.** That board carries two populations in one ranking. A
+wallet whose address begins `0x0000…` is from the committed synthetic fixture set; every
+other address is a real Somnia wallet whose real Event Contract trades were scored. Ten real
+wallets are ranked, seven of them nothing to do with this project — the list is
+[below](#the-ten-real-ranked-wallets). The two are not separated in the UI, and that is a
+known shortcoming rather than an oversight: it is recorded here instead of being hidden.
+
 ---
 
 ## The one-number summary
@@ -96,9 +106,10 @@ Somnia interaction with a transaction hash or a captured response in `fixtures/`
 `REPLAY` means recorded real data; `SYNTHETIC` means generated data with the real
 integration unverified; `STUB` means the interface exists and the implementation does not.
 
-**As of day 8 of nine, complete (`docs/BUILD_PLAN.md`).** Five rows below are `LIVE`; the
+**As of day 8 of nine, complete (`docs/BUILD_PLAN.md`).** Seven rows below are `LIVE`; the
 rest run on generated data. The agents are still collecting, so every count in those rows is
-a snapshot taken on 4 September and will have grown since; the transaction hashes will not.
+a snapshot and will have grown since; the transaction hashes will not. Counts dated 4
+September come from the local agent run, those dated 5 September from the deployment above.
 
 | Component | Status | Evidence |
 |---|---|---|
@@ -109,14 +120,14 @@ a snapshot taken on 4 September and will have grown since; the transaction hashe
 | `LiveAdapter` reads | **LIVE** | Reads the Shannon testnet indexer. A live ingest on 2 Sep pulled 10 markets, 56 fills and 16 distinct wallets, every market an Event Contract — see below. Evidence in [`fixtures/recorded/dreamdex-testnet-2026-09-01/`](fixtures/recorded/). |
 | `LiveAdapter` writes (`placeOrder`) | **LIVE** | One real order, signed by the `mid-anchored` agent wallet and accepted by the pool: [`0x76a5cd91…`](https://shannon-explorer.somnia.network/tx/0x76a5cd914e10ee54f19e31cea8efd6e950bc2bac3fd372215c39d6605e4996c0), block 477687098, status success, venue order id `147573952589676548652`. Sent by `pnpm place-one`. |
 | Persistence (`packages/db`) | SYNTHETIC | Schema extracted verbatim from `docs/API_SPEC.md` §1 into plain SQL and applied to SQLite; a test asserts the Drizzle mirror names exactly the columns the SQL creates. |
-| Ingestion and scoring pipeline (`apps/indexer`) | SYNTHETIC | Ingests every fixture, aggregates 1,112 positions, scores 861 of them, and writes 25 score rows with 250 calibration bins. A second run changes nothing. |
+| Ingestion and scoring pipeline (`apps/indexer`) | **LIVE** | Runs `KALIBRA_MODE=live` on the deployment above, ingesting Somnia testnet Event Contracts continuously: 8,107 markets settled, 3,630 positions scored and 1,491 wallets seen at 13:35 UTC on 5 September, captured in [`fixtures/recorded/live-index-2026-09-05/`](fixtures/recorded/live-index-2026-09-05/). Three reads minutes apart returned 8,081, 8,085 and 8,107, so it was still ingesting as this was written. Offline it is the same code against fixtures — ingests all of them, aggregates 1,112 positions, scores 861, writes 25 score rows with 250 calibration bins, and a second run changes nothing. |
 | Public read API (`apps/api`) | SYNTHETIC | Every endpoint in `docs/API_SPEC.md` §2, with responses parsed by their published Zod schema before they are sent in test mode. The example payloads in that document are parsed by the same schemas, so the spec and the server cannot drift apart without a test failing. |
-| Web app (`apps/web`) | SYNTHETIC | Landing page, leaderboard, Arena board and `/w/:address` profile, rendered per request from `apps/api` with no hardcoded, cached or fallback data — verified by killing the API and confirming that `/leaderboard` shows an error rather than numbers, and that the landing page drops its counters for a line saying the index is not answering rather than keeping the ones it last saw. Every quantity on the landing page is either read from `/v1/stats` at request time or is the committed V3 vector of `docs/SCORING_SPEC.md` §8, which it cites where it shows it; the explanatory prose around them is static, and the hero backdrop and the second screen's sky are labelled schematic because they are drawn, not measured. The landing page also reproduces the component and status columns of the table you are reading, held to this file by `apps/web/src/lib/evidence.test.ts`, which fails if the two disagree. The data displayed is the synthetic fixture set. |
+| Web app (`apps/web`) | **LIVE** | Landing page, leaderboard, Arena board and `/w/:address` profile, rendered per request from `apps/api` with no hardcoded, cached or fallback data — verified by killing the API and confirming that `/leaderboard` shows an error rather than numbers, and that the landing page drops its counters for a line saying the index is not answering rather than keeping the ones it last saw. Every quantity on the landing page is either read from `/v1/stats` at request time or is the committed V3 vector of `docs/SCORING_SPEC.md` §8, which it cites where it shows it; the explanatory prose around them is static, and the hero backdrop and the second screen's sky are labelled schematic because they are drawn, not measured. The landing page also reproduces the component and status columns of the table you are reading, held to this file by `apps/web/src/lib/evidence.test.ts`, which fails if the two disagree. **The deployment serves a mixed board — read what that means below before quoting a rank.** The rendered board is captured in [`fixtures/recorded/live-index-2026-09-05/`](fixtures/recorded/live-index-2026-09-05/). |
 | Guard policy engine (`packages/core/src/policy.ts`) | SYNTHETIC | All eleven reason codes from `docs/RISK_POLICY_SPEC.md` §4, one test each asserting that code and no other, plus the rule ordering: a killed agent over its daily loss sees `KILL_SWITCH_ACTIVE`. Pure — the clock is an argument. |
 | Guard audit chain (`packages/core/src/audit.ts`) | SYNTHETIC | Keccak-256 over canonical JSON. Verified in both directions: a clean log passes, and insertion, deletion, reordering and a single rewritten field each fail at the right index. Demonstrated against a live SQLite log, below. |
-| Guard transport (`apps/guard`) | **LIVE** | Orders from the demo agents are evaluated by Guard and forwarded to the pool under each agent's own key. Four Guard-forwarded fills are on Shannon, every one status `success`, each sent from the wallet its agent is scored under: [`0x0dec9ecb…`](https://shannon-explorer.somnia.network/tx/0x0dec9ecbb4aae319c8b66cf6c41a5f9ccca4b176899b8872608134cdb1c734a4) (block 478460478), [`0x3c8b17d0…`](https://shannon-explorer.somnia.network/tx/0x3c8b17d0fc6ac66e19f6924c41def312f75bc81bf8e3ffb8b247c89b979690e6), [`0x74c7ccad…`](https://shannon-explorer.somnia.network/tx/0x74c7ccadb1135698b3e8548a4d95ad5ef9326f6746fe25cd32c4aaf60fa6d017), [`0xf6552b9c…`](https://shannon-explorer.somnia.network/tx/0xf6552b9c208cd550a313321a686c8af075097e1cabfe4f0eb609c629d48a2924). Receipts re-checked against the chain, not read back from our own log. |
-| Guard enforcement in the live loop | **LIVE** | Ten of the eleven reason codes have fired against real orders. A single twelve-hour window on 4 Sep produced 5,119 audit entries — 2,575 allowed, 2,544 refused — including 370 `ORDER_TOO_LARGE` from `contrarian-fade`, which sizes past the limit on purpose so the refusals are produced by an agent trading rather than by a script staging them. The eleventh, `RATE_LIMIT_EXCEEDED`, has never been reached: the agents pace themselves below it. What the refusals correlate with is below. |
-| Kalibra Arena (`/v1/arena`) | **LIVE** | The three demo agents registered through the public `POST /v1/arena/register` endpoint — no row was inserted behind it — and are ranked on the same scores their wallets earn on the main leaderboard, verified field by field against `/v1/wallet/:address` by a test. All three are past the thirty-position minimum: `mid-anchored` `RANKED` **0** at n=170, `contrarian-fade` `RANKED` **0** at n=51, `momentum-lean` `RANKED` **392** at n=49. Two of the three sit on the floor of the scale and genuinely earned it — see below. |
+| Guard transport (`apps/guard`) | **LIVE** | Orders from the demo agents are evaluated by Guard and forwarded to the pool under each agent's own key. Four Guard-forwarded fills are on Shannon, every one status `success`, each sent from the wallet its agent is scored under: [`0x0dec9ecb…`](https://shannon-explorer.somnia.network/tx/0x0dec9ecbb4aae319c8b66cf6c41a5f9ccca4b176899b8872608134cdb1c734a4) (block 478460478), [`0x3c8b17d0…`](https://shannon-explorer.somnia.network/tx/0x3c8b17d0fc6ac66e19f6924c41def312f75bc81bf8e3ffb8b247c89b979690e6) (block 478460846), [`0x74c7ccad…`](https://shannon-explorer.somnia.network/tx/0x74c7ccadb1135698b3e8548a4d95ad5ef9326f6746fe25cd32c4aaf60fa6d017) (block 478461200), [`0xf6552b9c…`](https://shannon-explorer.somnia.network/tx/0xf6552b9c208cd550a313321a686c8af075097e1cabfe4f0eb609c629d48a2924) (block 478461285). Receipts re-checked against the chain, not read back from our own log, and committed at [`fixtures/recorded/chain-receipts-2026-09-05/`](fixtures/recorded/chain-receipts-2026-09-05/) so the check does not require leaving the repository. |
+| Guard enforcement in the live loop | **LIVE** | Ten of the eleven reason codes have fired against real orders. A single twelve-hour window on 4 Sep produced 5,119 audit entries — 2,575 allowed, 2,544 refused — including 370 `ORDER_TOO_LARGE` from `contrarian-fade`, which sizes past the limit on purpose so the refusals are produced by an agent trading rather than by a script staging them. The eleventh, `RATE_LIMIT_EXCEEDED`, has never been reached: the agents pace themselves below it. That window was written by the deployed instance, whose database is not in this repository; a smaller earlier window that **is** committed, showing the same ten codes and the same ordering, is at [`fixtures/recorded/guard-window-2026-09-03/`](fixtures/recorded/guard-window-2026-09-03/). What the refusals correlate with is below. |
+| Kalibra Arena (`/v1/arena`) | **LIVE** | The three demo agents registered through the public `POST /v1/arena/register` endpoint — no row was inserted behind it — and are ranked on the same scores their wallets earn on the main leaderboard, verified field by field against `/v1/wallet/:address` by a test. All three are past the thirty-position minimum: `mid-anchored` `RANKED` **0** at n=170, `contrarian-fade` `RANKED` **0** at n=51, `momentum-lean` `RANKED` **392** at n=49. Two of the three sit on the floor of the scale and genuinely earned it — see below. The board as served is committed at [`fixtures/recorded/live-index-2026-09-05/`](fixtures/recorded/live-index-2026-09-05/), where `arena.json` and `leaderboard-ranked.json` can be reconciled against each other. |
 | MCP server (`apps/mcp`) | SYNTHETIC | A real MCP client connects over the SDK transport and lists exactly the six tools of `docs/RISK_POLICY_SPEC.md` §7, in CI; the stdio entrypoint was additionally driven by hand against the running Guard and listed the same six. No policy-mutation tool exists, asserted by driving every tool and both resources through a recording transport and checking that the only write any of them produced was `POST /guard/order`. **No order has yet been placed through MCP against the live venue** — the tools reach Guard, and Guard's write path is the LIVE row above. |
 | `pnpm demo` | SYNTHETIC | Runs the whole pipeline offline into an in-memory database and asserts the result byte-for-byte against `fixtures/expected/demo-output.json`. |
 
@@ -249,8 +260,32 @@ every order and the adapter refuses to write, which is visible at startup rather
 `LIVE` on a row means that row's interaction happened, not that the whole system runs on
 chain data. It does not.
 
-The scoring the demo shows still runs on synthetic fixtures, because a hackathon-length live
-window has too few resolved positions to rank anyone.
+`pnpm demo` still scores synthetic fixtures, and stays that way on purpose: invariant I3
+requires it to run offline and deterministically, which a live window cannot. That is a
+property of the demo, not a statement about the product — the deployment scores live testnet
+wallets, and the next section lists them.
+
+### The ten real ranked wallets
+
+Read from `/v1/leaderboard?status=ranked` at 13:35 UTC on 5 September 2026 and committed verbatim at [`fixtures/recorded/live-index-2026-09-05/`](fixtures/recorded/live-index-2026-09-05/), so this table can be checked against the bytes rather than taken on trust. Seven are third parties with no
+connection to this project; three are the demo agents, marked. Every address here traded real
+Event Contracts on Shannon.
+
+| Wallet | Score | n | |
+|---|---|---|---|
+| `0x333c45737d453f8f98e2d8976bcfa43aa9610795` | 598 | 88 | third party |
+| `0xefeb51b07c70e891c95afdb05aed2139a40b3905` | 535 | 48 | third party |
+| `0xc904f38f38ef96e8741c7d9218a7899504b99e79` | 396 | 64 | third party |
+| `0xcf43cf2c66ac4ee6c8c4e9393cbd3f397f9925ea` | 392 | 49 | `momentum-lean` |
+| `0x93e300607c363e7d7a47e50f5c9fdf1723e859cf` | 329 | 307 | third party — the control wallet of the attribution trace |
+| `0xe7a8a7d81bad87512f9cab931e5122b5eaee8c7a` | 179 | 68 | third party |
+| `0xe11825b13c96ccbe49cff978932375ce13daaeb4` | 119 | 477 | third party |
+| `0x5c443c2ac5ee78b5eaf6711f7f8728cf55b8e1aa` | 29 | 35 | third party |
+| `0x36b9f702324246bff49c67747e60c854465fae4f` | 0 | 51 | `contrarian-fade` |
+| `0x5219ffbf9a44f96a8931a50a31021e4724518735` | 0 | 170 | `mid-anchored` |
+
+The other twenty ranked wallets on that board are the `0x0000…` fixture set. The numbers move
+as more windows settle; re-read the endpoint rather than trusting this table's age.
 
 ### What the demo shows
 
@@ -310,13 +345,13 @@ behind those numbers is recorded in that section.
 The DreamDEX integration is **partly verified**. Real payloads were captured anonymously
 from the Shannon testnet indexer on 1 Sep 2026 and are committed under
 [`fixtures/recorded/dreamdex-testnet-2026-09-01/`](fixtures/recorded/), with a README
-explaining what each byte establishes. Eleven questions in
+explaining what each byte establishes. Twelve questions in
 [`docs/DREAMDEX_ADAPTER.md`](docs/DREAMDEX_ADAPTER.md) §7 moved from documentation to
 capture, including both that were marked existential: fills carry `maker` and `taker`
 addresses, and reading another wallet's fills needs no key.
 
 That capture is what `LiveAdapter` was written against, and it is the evidence behind the
-one `LIVE` row in the table above. What it bought is a mapping table with verified rows
+`LIVE` rows in the table above. What it bought is a mapping table with verified rows
 instead of guesses.
 
 ---
@@ -361,8 +396,9 @@ ones do.
    intervals. The `PROVISIONAL` status and displayed sample size make this visible.
 5. **Settlement trust.** Kalibra reads outcomes from DreamDEX settlement. It does not
    independently verify that settlement was correct.
-6. **Testnet Only.** The current deployment operates on testnet. While the core logic and scoring
-  mechanics are fully functional, user behavior without real economic stakes may not perfectly mirror mainnet dynamics. Formal security audits and mainnet deployment represent the next phase of development.
+6. **Testnet only.** Everything here runs on Shannon testnet, where the stakes are not real
+   money. Traders behave differently when they can lose something, so the score distribution
+   measured here should not be assumed to hold on mainnet. Nothing has been security audited.
 
 ---
 
