@@ -11,10 +11,7 @@ import { shortHash } from '@/lib/format';
  */
 export function WhatThisIsNot({ params }: { params: ScoringParams }) {
   return (
-    <section
-      aria-labelledby="what-this-is-not"
-      className="rounded-xl border bg-card/40 p-6"
-    >
+    <section aria-labelledby="what-this-is-not" className="rounded-xl border bg-card/40 p-6">
       <h2
         id="what-this-is-not"
         className="font-mono text-[11px] tracking-[0.14em] text-signal uppercase"

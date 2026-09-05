@@ -118,7 +118,7 @@ in `layout.tsx`, and the whole palette is authored for it.
 ### Primary
 
 - **Signal Cyan** (`oklch(0.78 0.14 195)`): every measurement mark and nothing else — the
-  calibration curve, the site mark's off-diagonal dot, `LIVE` in the evidence table, the live
+  calibration curve, `LIVE` in the evidence table, the live
   indicator in the hero rail, and links that lead to a document. Restricting it to measurement
   is what keeps it meaningful; using it as a general "brand blue" would spend it.
 
@@ -138,6 +138,13 @@ in `layout.tsx`, and the whole palette is authored for it.
 `band-market`** — a neutral grey — rather than running warm to cool, because 500 is the metric's
 null value and colouring it as good would contradict the anchor the product is built on. These
 five never appear outside a score context.
+
+### The mark's green — outside the system, on purpose
+
+The logo raster carries a bright green (`~#60d800`) that is deliberately **not** a token and
+must not be reproduced in CSS. Green in this UI already means `band-strong`, "strong edge over
+the market", and a second green with a different meaning would make the first one unreadable.
+The green lives in `public/icon/icon.png` and the favicon composited from it, nowhere else.
 
 ### The dawn ramp
 
@@ -210,7 +217,7 @@ a shadow appears in exactly one place.
 - Radii: `0.625rem` base, `1.125rem` on panels, fully round on small controls. Pills are for
   buttons and status dots only; a pill-shaped container is a mistake.
 - The recurring form is the **field**: a square plot with a dashed 45° diagonal across it. It is
-  the favicon, the wordmark glyph, the hero backdrop, and the profile chart, and it is the
+  the hero backdrop, the hero rail's caption glyph, and the profile chart, and it is the
   reason the calibration chart's plot area is pinned square — the diagonal only means perfect
   calibration when both axes are scaled alike.
 - Every decorative layer on the landing page is geometry: gradients, one quadratic arc, three
@@ -229,6 +236,10 @@ a shadow appears in exactly one place.
 - **status label** — mono, uppercase, `0.14em` tracking. `LIVE` alone takes the signal colour
   and a filled dot; the other three grades are muted. Colouring all four would make the page's
   most important distinction the least visible thing on it.
+- **brand-mark** — `public/icon/icon.png`, statically imported so Next serves a 24px-tall
+  version of a 1402×1122 source. It sits at `h-6 w-auto` beside the wordmark in the header and
+  carries `alt=""`, because the wordmark next to it already names the product. The mark is
+  landscape (about 4:3); never force it into a square box.
 - **rule-fade** — the section divider. A 1px gradient that fades at both ends.
 - Focus is visible on every interactive element: a 2px signal outline at 3px offset.
 - Browser surfaces are themed rather than left at their defaults — selection sits at 30% signal,

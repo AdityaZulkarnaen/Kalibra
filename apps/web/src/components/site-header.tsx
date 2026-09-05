@@ -1,11 +1,13 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import { CalibrationGlyph } from '@/components/calibration-mark';
 import { SiteNav } from '@/components/site-nav';
+
+import mark from '../../public/icon/icon.png';
 
 /**
  * The header sits over the landing hero rather than above it, so the backdrop starts at the
@@ -39,7 +41,23 @@ export function SiteHeader() {
     >
       <div className="mx-auto flex h-full max-w-6xl items-center gap-x-4 px-6">
         <Link href="/" className="flex items-center gap-2.5">
-          <CalibrationGlyph className="size-6 shrink-0" />
+          {/*
+           * `width` and `height` are the rendered size, not the file's: without them Next has to
+           * assume the mark could fill the viewport and builds a srcset up to 3840px wide, which
+           * is a 1402×1122 source resampled to a poster to draw a 24px logo. The layout still
+           * comes from `h-6 w-auto`, so the file's own aspect survives a future swap.
+           *
+           * `alt` is empty on purpose: the wordmark beside it already says Kalibra, and a screen
+           * reader announcing the name twice for one link is worse than a mark it never mentions.
+           */}
+          <Image
+            src={mark}
+            alt=""
+            priority
+            width={30}
+            height={24}
+            className="h-6 w-auto shrink-0"
+          />
           <span className="text-base font-semibold tracking-tight">Kalibra</span>
         </Link>
         <p

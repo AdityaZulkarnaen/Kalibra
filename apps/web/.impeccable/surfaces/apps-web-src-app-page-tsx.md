@@ -54,6 +54,12 @@ opening screens join on a colour match instead of a scrim. Re-adding video would
 join and put two media on one night; do not reintroduce it without deciding that trade. CLAUDE.md §6 requires the real-vs-mocked table to stay accurate, so
 the rendered copy is asserted against README.md by a test rather than transcribed.
 
+**Mark replaced 5 September 2026.** The calibration-field logo is gone; the header and the
+favicon now come from `public/icon/icon.png`, a white K crossed by a rising green arrow. The
+calibration field stays as a figure — hero backdrop, hero rail caption, profile chart — but no
+longer signs the product. The green is not a token and must not enter CSS: green already means
+`band-strong` here. See PRODUCT.md for the recorded tension with PRD §8.
+
 ## Unresolved
 
 Whether to commit a licensed display face to `public/fonts/`. Left to the owner; the

@@ -137,9 +137,17 @@ to, and does not describe one as if it existed.
 ## Brand Commitments
 
 - **Name:** Kalibra. Three named surfaces: **Index**, **Arena**, **Guard**.
-- **Mark:** [`src/app/icon.svg`](src/app/icon.svg) — a dark rounded square, a dashed
-  diagonal, and a single cyan dot sitting off it. The diagonal is the product's central
-  image: the calibration reference line, and deviation from it is the whole subject.
+- **Mark:** [`public/icon/icon.png`](public/icon/icon.png) — a white letter K crossed by a
+  rising green arrow. Chosen by the owner on 5 September 2026, replacing the calibration-field
+  mark; [`src/app/icon.png`](src/app/icon.png) composites it onto the dark rounded square the
+  previous favicon used, because the K is near-white and vanishes on a light tab bar.
+  **A tension recorded rather than resolved:** a rising green arrow is the standard symbol for
+  profit, and both PRD §8 and the landing page's second screen say Kalibra does not measure
+  profit; green is additionally `--band-strong`, "strong edge over the market", everywhere else
+  in the UI. The mark is not licence to make a profit claim in copy anywhere.
+- **The calibration field is still the product's central image**, even though it is no longer
+  the logo: the diagonal is the calibration reference line and deviation from it is the whole
+  subject. It draws the hero backdrop and the profile chart.
 - **Dark theme is the shipped default**, pinned rather than preferred: `layout.tsx` sets
   `.dark` on `<html>` and there is no toggle. The whole palette, including the landing
   page's night-to-dawn ramp, is authored for it.
@@ -179,7 +187,8 @@ twelve-hour window while barely touching the best-scoring agent, without ever re
 score.
 
 **Absences that must not be filled by invention.** There is no hero video, no logo beyond
-the 32px mark, no photography, no illustration set, no testimonials, no customers, no
+the mark and the favicon composited from it, no photography, no illustration set, no
+testimonials, no customers, no
 press, no pricing, no mainnet deployment, and no recorded public demo URL. Every count
 above is a dated snapshot from a system still collecting — restating one as current
 requires re-measuring it, and the transaction hashes are the only figures that do not move.

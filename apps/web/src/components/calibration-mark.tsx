@@ -1,7 +1,7 @@
 /**
- * The product's mark: a calibration field with the perfect-calibration diagonal drawn across
- * it. The same shape is the hero graphic, the wordmark glyph and the favicon, which is what
- * makes it read as an identity rather than as three unrelated drawings.
+ * The calibration field as a figure: the plot, with the perfect-calibration diagonal drawn
+ * across it. It is the product's central image but it is no longer the brand mark — the logo
+ * is a raster at `public/icon/icon.png`, and this draws the thing the product measures.
  *
  * Unlike `calibration-chart.tsx`, this one may scale freely. A `viewBox` with a square aspect
  * and `preserveAspectRatio` keeps the diagonal at 45° at every size, so the geometry the real
@@ -109,8 +109,9 @@ export function CalibrationMark({ className }: { className?: string }) {
 }
 
 /**
- * The mark at glyph size. The full field turns to mud below about 24px, so the small version
- * keeps only what survives: the frame, the diagonal, and one point off it.
+ * The field at glyph size, for captioning a calibration field rather than for branding. The
+ * full plot turns to mud below about 24px, so this keeps only what survives at that size: the
+ * frame, the diagonal, and one point sitting off it.
  */
 export function CalibrationGlyph({ className }: { className?: string }) {
   return (
