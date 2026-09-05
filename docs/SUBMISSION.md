@@ -14,10 +14,27 @@ judge to infer any of these — state them in the submission text.
 
 ### "How effectively does the project use DreamDEX Event Contracts and available APIs/SDKs?"
 
-Kalibra consumes the full data surface: WebSocket for the live trade stream, REST for
-market and quote history, and on-chain reads for settlement. Guard writes back through the
-order API and exposes it over MCP, matching DreamDEX's own `AGENTS.md` / `SKILL.md`
-conventions.
+State the surface accurately, because it is not the obvious one. DreamDEX's HTTP API covers
+spot only and has **no event-contract endpoints** — the venue's own documentation says so, and
+`DREAMDEX_ADAPTER.md` U13 records it. The event-contract developer surface is the
+`@somnia-chain/markets-sdk` package plus a GraphQL indexer. So Kalibra uses:
+
+- **Reads** — GraphQL against the Shannon indexer at `dev.smk.somnia.host` for markets, fills
+  and resting orders. Hand-rolled over `fetch` rather than through the SDK, deliberately: it
+  lets the tests replay captured bytes with no network, and book reconstruction needs raw
+  order rows the SDK does not surface.
+- **Writes and chain reads** — `@somnia-chain/markets-sdk` 0.28.1, dynamically imported so the
+  offline path never loads it. `placeOrder` gates on the *on-chain* market status rather than
+  the indexer row, quantises to the pool's tick and lot, and clamps expiry to market close.
+- **Settlement** — on-chain: `getMarketResolution`, the payout vector, and ERC-6909 outcome
+  balances, which is what lets side attribution be traced to the money rather than trusted.
+
+Do not claim a WebSocket trade stream or a REST market API. Neither exists for Event
+Contracts, and `/v1/stream` in our own `API_SPEC.md` §3 is a P2 that was cut.
+
+Evidence to cite inline, both re-checked against the explorer on 5 September:
+`0x76a5cd91…` (block 477687098, `pnpm place-one`) and `0x0dec9ecb…` (block 478460478,
+forwarded through Guard).
 
 The point to make explicitly: **Event Contracts are not incidental to Kalibra — the
 product is impossible without them.** Binary resolution inside a short fixed window is the
@@ -94,7 +111,11 @@ sides nets to zero and is excluded; a partial wash pulls the score toward 500. G
 metric converges to the metric's null value. That falls out of using a proper scoring rule
 rather than being bolted on.
 
-**What is real.** [Paste the real-vs-mocked table from the README verbatim.]
+**What is real.** [Paste the real-vs-mocked table from the README verbatim.] Then add, in the
+same breath, the one thing the table does not say: the public leaderboard carries the synthetic
+fixture set and live testnet wallets in a single ranking, `0x0000…` addresses being the fixtures.
+Ten real wallets are ranked, seven of them third parties, one at n=477. Say it before a judge
+finds it.
 
 ### Tags
 
@@ -103,9 +124,9 @@ rather than being bolted on.
 
 ### Links
 
-- GitHub, public, MIT
-- Live demo, if deployed
-- Demo video, 2–3 minutes
+- GitHub, public, MIT — <https://github.com/AdityaZulkarnaen/Kalibra>
+- Live demo — <https://kalibra-frontend.vercel.app/>
+- Demo video, 2–3 minutes — **not yet recorded**, script in §3
 - `docs/SCORING_SPEC.md` linked directly — it is the strongest single artefact
 
 ---
