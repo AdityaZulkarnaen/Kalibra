@@ -45,7 +45,13 @@ the verdict, DESIGN.md, and every shipping raster carrying its provenance.
 
 No webfont download and no external asset: invariant I3 keeps the build hermetic, so the
 display face is a system serif with an optional self-hosted slot, and every parallax layer
-is drawn in CSS/SVG. CLAUDE.md §6 requires the real-vs-mocked table to stay accurate, so
+is drawn in CSS/SVG.
+
+**No footage layer, confirmed with the owner on 5 September 2026.** The `hero.mp4` drop slot
+and `src/lib/hero-video.ts` were deleted rather than left empty, and the hero's ground now
+runs from `--background` down to `--dawn-night` — the dawn ramp's first stop — so the two
+opening screens join on a colour match instead of a scrim. Re-adding video would break that
+join and put two media on one night; do not reintroduce it without deciding that trade. CLAUDE.md §6 requires the real-vs-mocked table to stay accurate, so
 the rendered copy is asserted against README.md by a test rather than transcribed.
 
 ## Unresolved

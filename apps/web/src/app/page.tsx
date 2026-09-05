@@ -9,7 +9,6 @@ import { ScoreScale } from '@/components/score-scale';
 import { ScoringWalkthrough } from '@/components/scoring-walkthrough';
 import { Section } from '@/components/section';
 import { SurfaceCards } from '@/components/surface-cards';
-import { heroVideoSrc } from '@/lib/hero-video';
 
 /**
  * The landing page.
@@ -109,27 +108,28 @@ export default function LandingPage() {
  * Nothing sits above the headline. A label there would be read before the sentence it labels,
  * and the sentence is the whole offer — the two facts a reader needs are in the rail along the
  * bottom, where they are found after the claim rather than in front of it.
+ *
+ * The ground is the top of the same sky the next screen finishes. It starts on the page's own
+ * black, so the header has something to match, and arrives at `--dawn-night` exactly where the
+ * dawn section's ramp begins — which is why there is no scrim along the bottom edge and no
+ * seam for one to hide. The two screens are one night, and the light only comes up once.
  */
 function Hero() {
   return (
-    <section className="relative -mt-(--header-h) flex min-h-[max(42rem,calc(100svh+var(--header-h)))] flex-col overflow-hidden">
-      <HeroBackdrop videoSrc={heroVideoSrc()} />
+    <section className="relative -mt-(--header-h) flex min-h-[max(42rem,calc(100svh+var(--header-h)))] flex-col overflow-hidden bg-[linear-gradient(to_bottom,var(--background)_0%,var(--background)_34%,var(--dawn-night)_100%)]">
+      <HeroBackdrop />
 
       {/*
-       * Three scrims. The top one sinks the field under the header, the bottom one hands the
-       * page off to the sky below without a hard edge, and the vignette keeps contrast behind
-       * the headline wherever the animation happens to be bright.
+       * Two layers over the field. The vignette keeps contrast behind the headline wherever the
+       * animation happens to be bright and settles the field into the ground at every edge; the
+       * top one sinks it under the header, in the page's black rather than the sky's.
        */}
       <div
+        className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(ellipse_at_50%_44%,transparent_4%,var(--dawn-night)_90%)] opacity-80"
+        aria-hidden="true"
+      />
+      <div
         className="pointer-events-none absolute inset-x-0 top-0 z-10 h-56 bg-linear-to-b from-background via-background/70 to-transparent"
-        aria-hidden="true"
-      />
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-64 bg-linear-to-t from-background via-background/80 to-transparent"
-        aria-hidden="true"
-      />
-      <div
-        className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(ellipse_at_50%_44%,transparent_4%,var(--background)_90%)] opacity-80"
         aria-hidden="true"
       />
 

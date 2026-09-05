@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 import {
   createForecasts,
@@ -12,15 +12,15 @@ import {
 } from '@/lib/calibration-field';
 
 /**
- * The hero's background.
+ * The hero's background: the calibration field, drawn to a canvas and animated.
  *
- * Two layers. Underneath, a canvas drawing the calibration field — the plot the product is
- * built on, animated. Over it, footage, if `heroVideoSrc()` found a file to play; it fades in
- * only once the browser reports it can decode, and an `error` at any later point drops it for
- * good. Either way the canvas is already showing, so the hero is never a black rectangle and
- * never waits on a download.
+ * This is the plot the product is built on — the market's probability across, observed frequency
+ * up, the perfect-calibration diagonal through it, and a flash each time a position settles.
+ * No frame of it is a wallet's record, and the hero's rail says so.
  *
- * No frame of either layer is a wallet's record. The hero's caption says so.
+ * Drawn rather than filmed, and the screen below is why. That one is a sky made of gradients and
+ * geometry; footage here would have made the page's first two screens two different media
+ * pretending to be one continuous night.
  */
 
 const FORECAST_COUNT = 150;
@@ -31,33 +31,7 @@ const SETTLE_INTERVAL = 0.55;
 /** A long frame means a backgrounded tab. Stepping it whole would teleport the field. */
 const MAX_FRAME = 1 / 20;
 
-export function HeroBackdrop({ videoSrc }: { videoSrc: string | null }) {
-  const [videoUsable, setVideoUsable] = useState(true);
-  const [videoReady, setVideoReady] = useState(false);
-
-  return (
-    <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
-      <CalibrationField />
-      {videoSrc !== null && videoUsable && (
-        <video
-          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ${
-            videoReady ? 'opacity-100' : 'opacity-0'
-          }`}
-          src={videoSrc}
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="auto"
-          onCanPlay={() => setVideoReady(true)}
-          onError={() => setVideoUsable(false)}
-        />
-      )}
-    </div>
-  );
-}
-
-function CalibrationField() {
+export function HeroBackdrop() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -133,7 +107,11 @@ function CalibrationField() {
     };
   }, []);
 
-  return <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />;
+  return (
+    <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+    </div>
+  );
 }
 
 /** The unit square, oversized so it bleeds off every edge and keeps the diagonal at 45°. */

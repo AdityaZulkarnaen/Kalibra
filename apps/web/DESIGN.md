@@ -179,6 +179,10 @@ tracking, uppercase. Display tracking never goes past `-0.025em`. Headings and h
 - Two full-viewport screens open the page: the hero at
   `max(42rem, 100svh + var(--header-h))` — it pulls itself up under the floating header by the
   header's exact height — and the dawn section at `min-h-svh` from the `sm` breakpoint up.
+- **The two screens share one sky.** The hero's ground runs from `background` down to
+  `dawn-night`, which is the first stop of the dawn section's ramp, so the boundary between them
+  is a colour match rather than a scrim. There is no footage layer and no slot for one; both
+  screens are drawn, which is what lets them join.
 - The header is `sticky`, chromeless over the landing hero and glass once there is page behind
   it. It is never `fixed`: the rest of the site needs it in flow.
 - The counters strip is lifted `-5rem` over the seam where the sky meets the page, so the first
@@ -195,9 +199,9 @@ a shadow appears in exactly one place.
 - Elevation is declared once per element — a border or a shadow, never both.
 - The one shadow is on the counters strip (`shadow-2xl shadow-black/50`), which is the only
   element that overlaps another surface and needs to say so.
-- Glass is used where it is doing a job and nowhere else: the header over moving footage, the
-  secondary hero button, and the counters strip lifted over the sky. It is a legibility device
-  here, not a material.
+- Glass is used where it is doing a job and nowhere else: the header over the animated field,
+  the secondary hero button, and the counters strip lifted over the sky. It is a legibility
+  device here, not a material.
 - The dawn section builds depth out of parallax rate instead: the arc travels 300px across the
   section, the fog banks 260px in from their own edges, and the sky does not move at all.
 
@@ -216,7 +220,7 @@ a shadow appears in exactly one place.
 ## Components
 
 - **button-primary** — a `foreground`-on-`background` pill. One per screen, and on the hero it
-  carries a soft cyan-tinted shadow because it sits over moving footage.
+  carries a soft cyan-tinted shadow because it sits over the animated field.
 - **button-glass** — the secondary action: a hairline border over 5% white with a backdrop blur.
 - **surface-card** — `bg-card/40` with a hairline. Cards are containers of last resort here;
   most sections are a heading, a lead, and content on the bare ground.

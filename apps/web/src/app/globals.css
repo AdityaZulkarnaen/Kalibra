@@ -240,11 +240,11 @@
 
 @layer components {
   /*
-   * Legibility for display type set over moving footage, not a decorative halo. The headline
-   * has to hold at 4.5:1 over whatever frame the video or the canvas happens to be showing,
-   * and darkening the whole hero enough to guarantee that would cost the backdrop. Two soft
-   * dark shadows do it locally; the third, faint and light, keeps the serif from looking
-   * smudged where the frame behind it is already dark.
+   * Legibility for display type set over a drawn field, not a decorative halo. The headline has
+   * to hold at 4.5:1 wherever the animation happens to be bright, and darkening the whole hero
+   * enough to guarantee that would cost the backdrop. Two soft dark shadows do it locally; the
+   * third, faint and light, keeps the serif from looking smudged where the ground behind it is
+   * already dark. The dawn statement uses the same rule over its sky.
    */
   .display-glow {
     text-shadow:

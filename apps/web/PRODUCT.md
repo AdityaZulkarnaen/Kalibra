@@ -140,9 +140,9 @@ to, and does not describe one as if it existed.
 - **Mark:** [`src/app/icon.svg`](src/app/icon.svg) — a dark rounded square, a dashed
   diagonal, and a single cyan dot sitting off it. The diagonal is the product's central
   image: the calibration reference line, and deviation from it is the whole subject.
-- **Dark theme is the shipped default**, stated as a standing fact in
-  [`public/media/README.md`](public/media/README.md): the page keeps its dark theme whether
-  or not hero footage is present.
+- **Dark theme is the shipped default**, pinned rather than preferred: `layout.tsx` sets
+  `.dark` on `<html>` and there is no toggle. The whole palette, including the landing
+  page's night-to-dawn ramp, is authored for it.
 - **Voice is governed by CLAUDE.md §6 and is binding.** No marketing language in code
   comments, the README, or the UI. No "blazing fast", no "revolutionary". State what the
   thing does. Discovered overclaiming is treated as fatal; acknowledged limitation is not.
@@ -151,9 +151,11 @@ to, and does not describe one as if it existed.
 - **LIVE / REPLAY / SYNTHETIC / STUB is a public honesty contract**, defined in the README.
   Where the UI grades its own data it uses those four words with exactly those meanings.
   `LIVE` requires a transaction hash or a captured response in `fixtures/`.
-- **Hero footage is optional and absent by design.** No `hero.mp4` is committed; the
-  landing page runs on a drawn calibration field instead and must keep working with no
-  video file.
+- **The landing page carries no footage, by decision.** Confirmed with the owner on
+  5 September 2026: the video slot was removed rather than left empty. Both opening screens
+  are drawn — an animated calibration field over one continuous night-to-dawn sky — and the
+  page must stay that way, because footage over the field would make the two screens two
+  media pretending to be one.
 
 ## Evidence on Hand
 

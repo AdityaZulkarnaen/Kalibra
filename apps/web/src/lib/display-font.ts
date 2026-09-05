@@ -4,11 +4,10 @@ import { join } from 'node:path';
 /**
  * Whether a display face has been dropped in for the landing page.
  *
- * The same contract `hero-video.ts` gives hero footage, and for the same reason: a webfont
- * fetched at build time would mean an offline clone cannot build the app, which is the failure
- * invariant I3 exists to rule out. A file committed to `public/fonts/` costs no network at any
- * point, and with no file the `--font-display` stack in `globals.css` falls through to the
- * system serif behind it.
+ * A webfont fetched at build time would mean an offline clone cannot build the app, which is
+ * the failure invariant I3 exists to rule out. A file committed to `public/fonts/` costs no
+ * network at any point, and with no file the `--font-display` stack in `globals.css` falls
+ * through to the system serif behind it.
  *
  * `@font-face` is emitted only when the file is there. Emitting it unconditionally would make
  * every page load ask for a font that does not exist, which is a 404 in the console of a
