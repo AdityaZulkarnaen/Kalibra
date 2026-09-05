@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { ScoreCell } from '@/components/score-cell';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -12,11 +13,6 @@ import {
 import type { LeaderboardEntry } from '@/lib/api';
 import { num, scoreDisplay, shortAddress } from '@/lib/format';
 
-/**
- * The sample size sits in the same cell as the score, not in a column a reader can skip.
- * `API_SPEC.md` §2 puts it plainly: a rank must never be seen without the sample behind it,
- * and that is the failure this product exists to correct.
- */
 export function LeaderboardTable({
   entries,
   minSample,
@@ -25,23 +21,41 @@ export function LeaderboardTable({
   minSample: number;
 }) {
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-14 text-right">#</TableHead>
-          <TableHead>Wallet</TableHead>
-          <TableHead className="w-52">Score</TableHead>
-          <TableHead className="text-right">BSS</TableHead>
-          <TableHead className="text-right">ECE excess</TableHead>
-          <TableHead className="text-right">AUC</TableHead>
+    <Table className="[&_td]:px-4 [&_td]:py-3.5 [&_th]:px-4">
+      <TableHeader className="bg-muted/40">
+        <TableRow className="hover:bg-transparent">
+          <TableHead className="w-14 text-right font-mono text-[11px] font-normal tracking-[0.12em] text-muted-foreground uppercase">
+            #
+          </TableHead>
+          <TableHead className="font-mono text-[11px] font-normal tracking-[0.12em] text-muted-foreground uppercase">
+            Wallet
+          </TableHead>
+          <TableHead className="w-56 font-mono text-[11px] font-normal tracking-[0.12em] text-muted-foreground uppercase">
+            Score
+          </TableHead>
+          <TableHead className="text-right font-mono text-[11px] font-normal tracking-[0.12em] text-muted-foreground uppercase">
+            BSS
+          </TableHead>
+          <TableHead className="text-right font-mono text-[11px] font-normal tracking-[0.12em] text-muted-foreground uppercase">
+            ECE excess
+          </TableHead>
+          <TableHead className="text-right font-mono text-[11px] font-normal tracking-[0.12em] text-muted-foreground uppercase">
+            AUC
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {entries.map((entry) => {
           const display = scoreDisplay(entry, minSample);
           return (
-            <TableRow key={entry.wallet}>
-              <TableCell className="text-right tabular-nums text-muted-foreground">
+            <TableRow key={entry.wallet} className="transition-colors hover:bg-secondary/40">
+              <TableCell
+                className={`text-right tabular-nums ${
+                  display.kind === 'score' && entry.rank <= 3
+                    ? 'font-medium text-foreground'
+                    : 'text-muted-foreground'
+                }`}
+              >
                 {display.kind === 'score' ? entry.rank : '—'}
               </TableCell>
               <TableCell>
@@ -58,21 +72,7 @@ export function LeaderboardTable({
                 )}
               </TableCell>
               <TableCell>
-                {display.kind === 'score' ? (
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xl tabular-nums">{display.value}</span>
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      n = {entry.n}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex items-baseline gap-2">
-                    <Badge variant="secondary">PROVISIONAL</Badge>
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {display.n} / {display.minSample} positions
-                    </span>
-                  </div>
-                )}
+                <ScoreCell display={display} n={entry.n} />
               </TableCell>
               <TableCell className="text-right tabular-nums">{num(entry.bss)}</TableCell>
               <TableCell className="text-right tabular-nums">{num(entry.eceExcess)}</TableCell>

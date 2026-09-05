@@ -13,10 +13,10 @@ export function Stat({
   hint?: string;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card/40 px-4 py-3">
+    <div className="rounded-lg border border-border bg-card/40 px-4 py-3.5 transition-colors hover:border-border hover:bg-card/70">
       <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1 text-lg tabular-nums">{num(value, digits)}</div>
-      {hint !== undefined && <div className="mt-0.5 text-[11px] text-muted-foreground">{hint}</div>}
+      <div className="mt-1.5 font-mono text-lg tabular-nums">{num(value, digits)}</div>
+      {hint !== undefined && <div className="mt-1 text-[11px] text-muted-foreground">{hint}</div>}
     </div>
   );
 }

@@ -62,7 +62,7 @@ packages/adapter-dreamdex/  the only place that knows the venue exists
 packages/db/                SQLite schema and queries
 apps/indexer/               ingest -> aggregate -> score
 apps/api/                   public read API (:3001)
-apps/web/                   Next.js leaderboard, profile, arena (:3000)
+apps/web/                   Next.js landing, leaderboard, profile, arena (:3000)
 apps/guard/                 policy engine over HTTP (:3002)
 apps/mcp/                   Guard as an MCP server, over stdio
 apps/agent/                 three demo agents that trade through Guard

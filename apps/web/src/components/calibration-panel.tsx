@@ -19,7 +19,7 @@ export function CalibrationPanel({ bins }: { bins: readonly CalibrationBin[] }) 
     <section className="rounded-xl border border-border bg-card/40 p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold tracking-tight">Calibration</h2>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs tabular-nums text-muted-foreground">
           {populated.length} of {points.length} bins populated
         </p>
       </div>
@@ -29,30 +29,31 @@ export function CalibrationPanel({ bins }: { bins: readonly CalibrationBin[] }) 
           No settled positions, so there is no calibration to plot.
         </p>
       ) : (
-        <>
-          <div className="mt-4 overflow-x-auto">
-            <CalibrationChart points={points} />
+        <div className="mt-5 flex flex-wrap items-start gap-x-10 gap-y-8">
+          <div className="min-w-0">
+            <div className="overflow-x-auto">
+              <CalibrationChart points={points} />
+            </div>
+            <p className="mt-3 max-w-[460px] text-xs leading-relaxed text-muted-foreground">
+              Each point is one confidence band: mean forecast against how often those forecasts
+              came true. The dashed diagonal is perfect calibration. Points above it are forecasts
+              that came true more often than claimed; points below came true less often. Dot area is
+              the number of positions in the band. Empty bands are gaps, not interpolated.
+              {deviation !== null && (
+                <>
+                  {' '}
+                  Count-weighted mean deviation from the diagonal:{' '}
+                  <span className="tabular-nums text-foreground">
+                    {deviation > 0 ? '+' : ''}
+                    {deviation.toFixed(4)}
+                  </span>
+                  .
+                </>
+              )}
+            </p>
           </div>
 
-          <p className="mt-2 max-w-[460px] text-xs leading-relaxed text-muted-foreground">
-            Each point is one confidence band: mean forecast against how often those forecasts came
-            true. The dashed diagonal is perfect calibration. Points above it are forecasts that
-            came true more often than claimed; points below came true less often. Dot area is the
-            number of positions in the band. Empty bands are gaps, not interpolated.
-            {deviation !== null && (
-              <>
-                {' '}
-                Count-weighted mean deviation from the diagonal:{' '}
-                <span className="tabular-nums text-foreground">
-                  {deviation > 0 ? '+' : ''}
-                  {deviation.toFixed(4)}
-                </span>
-                .
-              </>
-            )}
-          </p>
-
-          <table className="mt-6 w-full max-w-[560px] text-sm">
+          <table className="w-full min-w-[340px] flex-1 text-sm">
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
                 <th className="py-2 text-left font-normal">Band</th>
@@ -62,24 +63,23 @@ export function CalibrationPanel({ bins }: { bins: readonly CalibrationBin[] }) 
               </tr>
             </thead>
             <tbody>
-              {points.map((point) => (
-                <tr
-                  key={point.bin}
-                  className={
-                    point.observedFreq === null
-                      ? 'border-b border-border/50 text-muted-foreground'
-                      : 'border-b border-border/50'
-                  }
-                >
-                  <td className="py-1.5 font-mono text-xs">{point.label}</td>
-                  <td className="py-1.5 text-right tabular-nums">{point.count}</td>
-                  <td className="py-1.5 text-right tabular-nums">{num(point.meanForecast)}</td>
-                  <td className="py-1.5 text-right tabular-nums">{num(point.observedFreq)}</td>
-                </tr>
-              ))}
+              {points.map((point) => {
+                const empty = point.observedFreq === null;
+                return (
+                  <tr
+                    key={point.bin}
+                    className={`border-b border-border/50 ${empty ? 'text-muted-foreground/60' : ''}`}
+                  >
+                    <td className="py-1.5 font-mono text-xs">{point.label}</td>
+                    <td className="py-1.5 text-right tabular-nums">{point.count}</td>
+                    <td className="py-1.5 text-right tabular-nums">{num(point.meanForecast)}</td>
+                    <td className="py-1.5 text-right tabular-nums">{num(point.observedFreq)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
-        </>
+        </div>
       )}
     </section>
   );

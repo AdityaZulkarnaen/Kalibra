@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { ApiNotFoundError, ApiUnavailableError, fetchLeaderboard, fetchWallet } from './api';
+import {
+  ApiNotFoundError,
+  ApiUnavailableError,
+  fetchLeaderboard,
+  fetchStats,
+  fetchWallet,
+} from './api';
 
 /**
  * The failure paths matter more than the happy one here: BUILD_PLAN.md day 5 requires that
@@ -102,5 +108,48 @@ describe('fetchWallet', () => {
         fetch: respond({ error: { code: 'NOT_FOUND', message: 'no positions' } }, 404),
       }),
     ).rejects.toThrow(ApiNotFoundError);
+  });
+});
+
+describe('fetchStats', () => {
+  const statsBody = {
+    totalWallets: 25,
+    rankedWallets: 20,
+    positionsScored: 861,
+    marketsSettled: 60,
+    mode: 'replay',
+    lastIngestedAt: 1_756_900_000_000,
+    paramsHash: `0x${'b'.repeat(64)}`,
+    rejectedPayloads: null,
+  };
+
+  it('parses the pipeline counters the landing page reports', async () => {
+    const stats = await fetchStats({
+      baseUrl: 'http://api.invalid',
+      fetch: respond(statsBody),
+    });
+    expect(stats.positionsScored).toBe(861);
+    expect(stats.mode).toBe('replay');
+  });
+
+  it('accepts the nulls the endpoint is specified to return', async () => {
+    // `rejectedPayloads` is null by design: nothing counts them yet, and a zero would read
+    // as "ingestion is clean" rather than "nobody is counting". Same for a fresh database
+    // that has never been ingested into.
+    const stats = await fetchStats({
+      baseUrl: 'http://api.invalid',
+      fetch: respond({ ...statsBody, mode: null, lastIngestedAt: null, paramsHash: null }),
+    });
+    expect(stats.rejectedPayloads).toBeNull();
+    expect(stats.lastIngestedAt).toBeNull();
+  });
+
+  it('throws when the API is unreachable, so the caller cannot mistake it for zeroes', async () => {
+    await expect(
+      fetchStats({
+        baseUrl: 'http://api.invalid',
+        fetch: () => Promise.reject(new Error('ECONNREFUSED')),
+      }),
+    ).rejects.toThrow(ApiUnavailableError);
   });
 });

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { Badge } from '@/components/ui/badge';
+import { ScoreCell } from '@/components/score-cell';
 import {
   Table,
   TableBody,
@@ -28,57 +28,57 @@ export function ArenaTable({
   minSample: number;
 }) {
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-14 text-right">#</TableHead>
-          <TableHead>Agent</TableHead>
-          <TableHead className="w-52">Score</TableHead>
-          <TableHead className="text-right">BSS</TableHead>
-          <TableHead className="text-right">ECE excess</TableHead>
-          <TableHead className="text-right">AUC</TableHead>
+    <Table className="[&_td]:px-4 [&_td]:py-3.5 [&_th]:px-4">
+      <TableHeader className="bg-muted/40">
+        <TableRow className="hover:bg-transparent">
+          <TableHead className="w-14 text-right font-mono text-[11px] font-normal tracking-[0.12em] text-muted-foreground uppercase">
+            #
+          </TableHead>
+          <TableHead className="font-mono text-[11px] font-normal tracking-[0.12em] text-muted-foreground uppercase">
+            Agent
+          </TableHead>
+          <TableHead className="w-56 font-mono text-[11px] font-normal tracking-[0.12em] text-muted-foreground uppercase">
+            Score
+          </TableHead>
+          <TableHead className="text-right font-mono text-[11px] font-normal tracking-[0.12em] text-muted-foreground uppercase">
+            BSS
+          </TableHead>
+          <TableHead className="text-right font-mono text-[11px] font-normal tracking-[0.12em] text-muted-foreground uppercase">
+            ECE excess
+          </TableHead>
+          <TableHead className="text-right font-mono text-[11px] font-normal tracking-[0.12em] text-muted-foreground uppercase">
+            AUC
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {entries.map((entry) => {
           const display = scoreDisplay(entry, minSample);
           return (
-            <TableRow key={entry.agentId}>
+            <TableRow key={entry.agentId} className="transition-colors hover:bg-secondary/40">
               <TableCell className="text-right tabular-nums text-muted-foreground">
                 {display.kind === 'score' ? entry.rank : '—'}
               </TableCell>
-              <TableCell className="max-w-md">
-                <Link
-                  href={`/w/${entry.wallet}`}
-                  className="font-medium underline-offset-4 hover:underline"
-                >
-                  {entry.agentName ?? entry.agentId}
-                </Link>
-                <span className="ml-2 font-mono text-xs text-muted-foreground">
-                  {shortAddress(entry.wallet)}
-                </span>
-                {entry.method !== null && (
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    {entry.method}
-                  </p>
-                )}
+              <TableCell>
+                <div className="max-w-md">
+                  <Link
+                    href={`/w/${entry.wallet}`}
+                    className="font-medium underline-offset-4 hover:underline"
+                  >
+                    {entry.agentName ?? entry.agentId}
+                  </Link>
+                  <span className="ml-2 font-mono text-xs text-muted-foreground">
+                    {shortAddress(entry.wallet)}
+                  </span>
+                  {entry.method !== null && (
+                    <p className="mt-1.5 text-xs leading-relaxed text-pretty text-muted-foreground">
+                      {entry.method}
+                    </p>
+                  )}
+                </div>
               </TableCell>
               <TableCell>
-                {display.kind === 'score' ? (
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xl tabular-nums">{display.value}</span>
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      n = {entry.n}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex items-baseline gap-2">
-                    <Badge variant="secondary">PROVISIONAL</Badge>
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {display.n} / {display.minSample} positions
-                    </span>
-                  </div>
-                )}
+                <ScoreCell display={display} n={entry.n} />
               </TableCell>
               <TableCell className="text-right tabular-nums">{num(entry.bss)}</TableCell>
               <TableCell className="text-right tabular-nums">{num(entry.eceExcess)}</TableCell>

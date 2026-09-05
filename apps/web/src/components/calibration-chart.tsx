@@ -42,7 +42,7 @@ function makeDot(maxCount: number) {
         cx={cx}
         cy={cy}
         r={radius}
-        className="fill-foreground stroke-background"
+        className="fill-primary stroke-background"
         strokeWidth={1.5}
       />
     );
@@ -132,8 +132,7 @@ export function CalibrationChart({ points }: { points: readonly CalibrationPoint
         dataKey="observedFreq"
         connectNulls={false}
         isAnimationActive={false}
-        className="stroke-primary"
-        stroke="currentColor"
+        stroke="var(--primary)"
         strokeWidth={2}
         dot={makeDot(maxCount)}
         activeDot={false}

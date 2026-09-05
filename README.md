@@ -66,6 +66,9 @@ pnpm web           # Next.js on :3000, reading that API and nothing else
 pnpm guard         # policy engine on :3002, between an agent and the venue
 ```
 
+`/` explains what the score measures, `/leaderboard` is the index itself, `/arena` is the
+agent board, and `/w/:address` is one wallet's profile and calibration curve.
+
 To put agents in front of it:
 
 ```bash
@@ -108,7 +111,7 @@ a snapshot taken on 4 September and will have grown since; the transaction hashe
 | Persistence (`packages/db`) | SYNTHETIC | Schema extracted verbatim from `docs/API_SPEC.md` §1 into plain SQL and applied to SQLite; a test asserts the Drizzle mirror names exactly the columns the SQL creates. |
 | Ingestion and scoring pipeline (`apps/indexer`) | SYNTHETIC | Ingests every fixture, aggregates 1,112 positions, scores 861 of them, and writes 25 score rows with 250 calibration bins. A second run changes nothing. |
 | Public read API (`apps/api`) | SYNTHETIC | Every endpoint in `docs/API_SPEC.md` §2, with responses parsed by their published Zod schema before they are sent in test mode. The example payloads in that document are parsed by the same schemas, so the spec and the server cannot drift apart without a test failing. |
-| Web app (`apps/web`) | SYNTHETIC | Leaderboard and `/w/:address` profile, rendered per request from `apps/api` with no hardcoded, cached or fallback data — verified by killing the API and confirming the page shows an error rather than numbers. The data it displays is the synthetic fixture set. |
+| Web app (`apps/web`) | SYNTHETIC | Landing page, leaderboard, Arena board and `/w/:address` profile, rendered per request from `apps/api` with no hardcoded, cached or fallback data — verified by killing the API and confirming that `/leaderboard` shows an error rather than numbers, and that the landing page drops its counters for a line saying the index is not answering rather than keeping the ones it last saw. Every quantity on the landing page is either read from `/v1/stats` at request time or is the committed V3 vector of `docs/SCORING_SPEC.md` §8, which it cites where it shows it; the explanatory prose around them is static, and the hero backdrop and the second screen's sky are labelled schematic because they are drawn, not measured. The landing page also reproduces the component and status columns of the table you are reading, held to this file by `apps/web/src/lib/evidence.test.ts`, which fails if the two disagree. The data displayed is the synthetic fixture set. |
 | Guard policy engine (`packages/core/src/policy.ts`) | SYNTHETIC | All eleven reason codes from `docs/RISK_POLICY_SPEC.md` §4, one test each asserting that code and no other, plus the rule ordering: a killed agent over its daily loss sees `KILL_SWITCH_ACTIVE`. Pure — the clock is an argument. |
 | Guard audit chain (`packages/core/src/audit.ts`) | SYNTHETIC | Keccak-256 over canonical JSON. Verified in both directions: a clean log passes, and insertion, deletion, reordering and a single rewritten field each fail at the right index. Demonstrated against a live SQLite log, below. |
 | Guard transport (`apps/guard`) | **LIVE** | Orders from the demo agents are evaluated by Guard and forwarded to the pool under each agent's own key. Four Guard-forwarded fills are on Shannon, every one status `success`, each sent from the wallet its agent is scored under: [`0x0dec9ecb…`](https://shannon-explorer.somnia.network/tx/0x0dec9ecbb4aae319c8b66cf6c41a5f9ccca4b176899b8872608134cdb1c734a4) (block 478460478), [`0x3c8b17d0…`](https://shannon-explorer.somnia.network/tx/0x3c8b17d0fc6ac66e19f6924c41def312f75bc81bf8e3ffb8b247c89b979690e6), [`0x74c7ccad…`](https://shannon-explorer.somnia.network/tx/0x74c7ccadb1135698b3e8548a4d95ad5ef9326f6746fe25cd32c4aaf60fa6d017), [`0xf6552b9c…`](https://shannon-explorer.somnia.network/tx/0xf6552b9c208cd550a313321a686c8af075097e1cabfe4f0eb609c629d48a2924). Receipts re-checked against the chain, not read back from our own log. |
@@ -236,11 +239,15 @@ fill the UP leg risks 99.80 and the DOWN leg risks 100.20, summing to the 200.00
 quantity. A trader long UP at probability p risks p·q; a trader long DOWN risks (1−p)·q.
 Using the premium for both would have overstated every DOWN position's conviction.
 
-`placeOrder` is implemented as of 2 Sep, but **nothing in this repository has yet sent a
-transaction**: the write path needs a funded Shannon signer and none is configured. With no
-`GUARD_SIGNER_KEY`, Guard still evaluates and logs every order and the adapter refuses to
-write, which is visible at startup rather than silent. This section will carry a transaction
-hash when one exists, and not before.
+`placeOrder` is implemented as of 2 Sep and the write path has since been exercised against
+Shannon: one order sent directly by `pnpm place-one`, and four more forwarded through Guard
+under each agent's own key. All five hashes are in the table above, and their receipts were
+re-checked against the chain rather than read back from our own log. The write path needs a
+funded signer to do any of this: with no `GUARD_SIGNER_KEY`, Guard still evaluates and logs
+every order and the adapter refuses to write, which is visible at startup rather than silent.
+
+`LIVE` on a row means that row's interaction happened, not that the whole system runs on
+chain data. It does not.
 
 The scoring the demo shows still runs on synthetic fixtures, because a hackathon-length live
 window has too few resolved positions to rank anyone.

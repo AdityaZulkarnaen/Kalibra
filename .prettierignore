@@ -12,3 +12,6 @@ docs/
 # Next build output.
 apps/web/.next/
 apps/web/next-env.d.ts
+
+# Vendored agent skills. Third-party content, formatted however upstream ships it.
+.agents/

@@ -1,4 +1,4 @@
-import { arenaSchema, leaderboardSchema, walletSchema } from '@kalibra/api/schemas';
+import { arenaSchema, leaderboardSchema, statsSchema, walletSchema } from '@kalibra/api/schemas';
 import { KalibraError } from '@kalibra/core/errors';
 import { z } from 'zod';
 
@@ -21,6 +21,7 @@ export type ArenaEntry = Arena['entries'][number];
 export type Wallet = z.infer<typeof walletSchema>;
 export type CalibrationBin = Wallet['calibration'][number];
 export type ScoringParams = Leaderboard['params'];
+export type Stats = z.infer<typeof statsSchema>;
 
 /** The API is unreachable, or answered with something that is not its published contract. */
 export class ApiUnavailableError extends KalibraError {
@@ -112,4 +113,14 @@ export function fetchArena(
   options: ApiOptions = {},
 ): Promise<Arena> {
   return get(`/v1/arena?status=${status}&limit=${limit}`, arenaSchema, options);
+}
+
+/**
+ * Pipeline health, `API_SPEC.md` §2.
+ *
+ * The landing page is the only caller. Unlike the boards it can still say something useful
+ * with this missing, so it catches rather than propagates — see the note where it does.
+ */
+export function fetchStats(options: ApiOptions = {}): Promise<Stats> {
+  return get('/v1/stats', statsSchema, options);
 }

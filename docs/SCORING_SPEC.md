@@ -550,9 +550,7 @@ difference between a credible metric and an overclaim.
 Kalibra measures **informational edge**: whether a trader's deviations from the market's
 own probability were, on average, in the right direction. It does not measure
 profitability. A well-calibrated trader can lose money through poor sizing or bad fills,
-and a badly calibrated one can profit through luck. The two properties are related but
-distinct, and conflating them is the error Kalibra exists to correct — in the other
-direction.
+and a badly calibrated one can profit through luck.
 
 The forecast model in §3 is an assumption. Different `LAMBDA_MAX` produces different
 scores. The parameter is published, and the API returns the parameter set used for every
